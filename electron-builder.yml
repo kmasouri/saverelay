@@ -1,0 +1,39 @@
+appId: com.kmasouri.calmember
+productName: Calm Ember
+copyright: Copyright © 2026 Kayvan Masouri
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+extraResources:
+  - from: resources/syncthing/${platform}-${arch}
+    to: syncthing
+  - from: resources
+    to: .
+    filter: ["*.png"]
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: CalmEmber-Setup-${version}.${ext}
+nsis:
+  # Per-user, no admin prompt: updates install silently in the background like Discord.
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  differentialPackage: true
+  deleteAppDataOnUninstall: false
+  shortcutName: Calm Ember
+mac:
+  target: [dmg]
+  category: public.app-category.games
+linux:
+  target: [AppImage]
+  category: Game
+publish:
+  provider: github
+  owner: kmasouri
+  repo: calm-ember-releases
+  releaseType: release

@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Fetch Syncthing for the transport integration test
+        run: node scripts/fetch-syncthing.mjs linux x64
+      - run: npm test
+        env:
+          SYNCTHING_BIN: ${{ github.workspace }}/resources/syncthing/linux-x64/syncthing
+      - run: npm run build

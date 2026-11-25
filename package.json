@@ -1,0 +1,35 @@
+{
+  "name": "calm-ember",
+  "productName": "Calm Ember",
+  "version": "0.1.0",
+  "description": "Automatic game save sharing between trusted friends",
+  "author": "Kayvan Masouri",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && svelte-check --tsconfig ./tsconfig.web.json --fail-on-warnings",
+    "test": "vitest run",
+    "fetch:syncthing": "node scripts/fetch-syncthing.mjs",
+    "dist:win": "npm run build && electron-builder --win --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.2",
+    "@tsconfig/svelte": "5.0.9",
+    "@types/node": "24.19.4",
+    "electron": "45.5.0",
+    "electron-builder": "26.18.0",
+    "electron-vite": "6.0.0",
+    "svelte": "5.59.2",
+    "svelte-check": "4.7.8",
+    "typescript": "6.0.3",
+    "vite": "8.3.8",
+    "vitest": "5.1.2"
+  }
+}
