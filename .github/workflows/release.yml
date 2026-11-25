@@ -37,6 +37,14 @@ jobs:
         if: ${{ env.RELEASES_TOKEN == '' }}
         run: npx electron-builder --win --x64 --publish never
 
+      - name: Verify the packaged app
+        shell: bash
+        run: |
+          ls -la dist/win-unpacked/resources dist/win-unpacked/resources/syncthing
+          test -f dist/win-unpacked/resources/syncthing/syncthing.exe
+          test -f dist/win-unpacked/resources/tray.png
+          cat dist/win-unpacked/resources/app-update.yml
+
       - uses: actions/upload-artifact@v4
         with:
           name: CalmEmber-windows
