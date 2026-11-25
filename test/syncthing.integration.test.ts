@@ -1,7 +1,7 @@
 // End-to-end transport test with two real Syncthing instances on localhost.
 // Runs only when SYNCTHING_BIN points at a Syncthing binary (CI fetches one).
 
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -21,12 +21,26 @@ function freePort(): Promise<number> {
   })
 }
 
+const logs: string[] = []
+let dump: () => Promise<string> = async () => ''
+
+async function listTree(dir: string, prefix = ''): Promise<string[]> {
+  const out: string[] = []
+  for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+    out.push(prefix + e.name)
+    if (e.isDirectory()) out.push(...(await listTree(join(dir, e.name), prefix + e.name + '/')))
+  }
+  return out
+}
+
 async function until(what: string, fn: () => Promise<boolean>, timeoutMs = 120_000): Promise<void> {
   const end = Date.now() + timeoutMs
   while (Date.now() < end) {
     if (await fn().catch(() => false)) return
     await new Promise((r) => setTimeout(r, 1000))
   }
+  console.log(await dump())
+  console.log(logs.slice(-150).join('\n'))
   throw new Error(`Timed out waiting for ${what}`)
 }
 
@@ -46,7 +60,7 @@ describe.skipIf(!BIN)('real Syncthing transport', () => {
         binary: BIN!,
         home: join(root, name, 'st'),
         apiKey: `key-${name}-0123456789`,
-        log: () => {},
+        log: (m) => logs.push(`${name} ${m}`),
         options: { listenAddresses: [`tcp://127.0.0.1:${port}`], globalAnnounceEnabled: false, localAnnounceEnabled: false, relaysEnabled: false, natEnabled: false },
       })
       await st.start()
@@ -58,8 +72,8 @@ describe.skipIf(!BIN)('real Syncthing transport', () => {
         documentsDir: root,
         syncthing: st,
         detector: { running: async () => new Set<string>() },
-        notify: () => {},
-        log: () => {},
+        notify: (t, m) => logs.push(`${name} NOTIFY ${t}: ${m}`),
+        log: (m) => logs.push(`${name} ENGINE ${m}`),
         settleMs: 0,
         stableMs: 500,
       })
@@ -70,6 +84,8 @@ describe.skipIf(!BIN)('real Syncthing transport', () => {
 
     const a = await make('Alice')
     const b = await make('Bob')
+    dump = async () =>
+      JSON.stringify({ a: a.engine.snapshot().worlds, b: b.engine.snapshot().worlds, aTree: await listTree(join(root, 'Alice', 'data', 'staging')), bTree: await listTree(join(root, 'Bob', 'data', 'staging')), bSaves: await listTree(b.saves) }, null, 1)
     await a.engine.addPeer(b.engine.invite())
     await b.engine.addPeer(a.engine.invite())
     await a.st.ensureDevice(b.st.myId, 'Bob', [`tcp://127.0.0.1:${b.port}`])
