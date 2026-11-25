@@ -154,11 +154,16 @@ export class Syncthing {
       devices: [this.myId, ...deviceIds].map((d) => ({ deviceID: d })),
       fsWatcherEnabled: true,
       fsWatcherDelayS: 2,
-      rescanIntervalS: 300,
+      rescanIntervalS: 60,
       ignorePerms: true,
       // History lives in our store; the transport never deletes shared content on its own.
       ignoreDelete: true,
     })
+  }
+
+  /** Asks for an immediate rescan so new events don't wait on the filesystem watcher. */
+  async scan(worldId: string): Promise<void> {
+    await this.request('POST', `/rest/db/scan?folder=${encodeURIComponent(FOLDER_PREFIX + worldId)}`)
   }
 
   async removeFolder(worldId: string): Promise<void> {

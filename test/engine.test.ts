@@ -28,6 +28,7 @@ class FakeNet {
       running: true,
       async ensureDevice() {},
       async removeDevice() {},
+      async scan() {},
       async ensureFolder(worldId: string, label: string, path: string, devices: string[]) {
         net.folders.get(myId)!.set(FOLDER_PREFIX + worldId, { path, devices, label })
       },

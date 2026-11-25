@@ -85,6 +85,8 @@ export class Engine extends EventEmitter {
   private pendingDevices: { deviceId: string; name: string; address: string }[] = []
   private pendingFolders: { folderId: string; label: string; offeredBy: string[] }[] = []
   private connections: Record<string, boolean> = {}
+  /** Worlds whose staging store changed locally since the transport last scanned it. */
+  private dirty = new Set<string>()
   private readonly now: () => number
   private readonly settleMs: number
   private readonly stableMs: number
@@ -179,6 +181,7 @@ export class Engine extends EventEmitter {
       this.cfg.identity,
     )
     await store.writeEvent(event)
+    this.dirty.add(store.worldId)
     return event
   }
 
@@ -221,6 +224,7 @@ export class Engine extends EventEmitter {
       await this.tickWorld(w, running)
       if (JSON.stringify(this.states.get(w.id)) !== before) await this.persistState(w.id)
     }
+    await this.flushToTransport()
     this.emit('change')
   }
 
@@ -247,6 +251,23 @@ export class Engine extends EventEmitter {
     if (!st?.running) return
     const devices = this.cfg.peers.filter((p) => !p.removed && w.sharedWith.includes(p.deviceId)).map((p) => p.syncthingId)
     await st.ensureFolder(w.id, w.name, this.stagingDir(w.id), devices)
+  }
+
+  private async flushToTransport(): Promise<void> {
+    const st = this.deps.syncthing
+    if (!st?.running) return
+    for (const worldId of [...this.dirty]) {
+      if (!this.cfg.worlds.some((w) => w.id === worldId)) {
+        this.dirty.delete(worldId)
+        continue
+      }
+      try {
+        await st.scan(worldId)
+        this.dirty.delete(worldId)
+      } catch (err) {
+        this.deps.log(`transport rescan failed: ${String(err)}`)
+      }
+    }
   }
 
   private async pollTransport(): Promise<void> {
