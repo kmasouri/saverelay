@@ -45,6 +45,22 @@ jobs:
           test -f dist/win-unpacked/resources/tray.png
           cat dist/win-unpacked/resources/app-update.yml
 
+      - name: Smoke test the packaged app
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist/win-unpacked/Calm Ember.exe" -ArgumentList "--hidden" -PassThru
+          $log = Join-Path $env:APPDATA "Calm Ember/logs/main.log"
+          $ok = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep -Seconds 2
+            if ((Test-Path $log) -and (Select-String -Path $log -Pattern "Syncthing started as" -Quiet)) { $ok = $true; break }
+          }
+          Start-Sleep -Seconds 5
+          if (Test-Path $log) { Get-Content $log | Select-Object -Last 40 }
+          Get-Process -Name "Calm Ember","syncthing" -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not $ok) { throw "App did not start Syncthing" }
+          if (Select-String -Path $log -Pattern "failed|exited unexpectedly" -Quiet) { throw "Errors in startup log" }
+
       - uses: actions/upload-artifact@v4
         with:
           name: CalmEmber-windows
