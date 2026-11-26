@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { call, type AppState } from './lib/api'
+  import Logo from './lib/Logo.svelte'
   import StatusBadge from './lib/StatusBadge.svelte'
   import Overview from './views/Overview.svelte'
   import WorldDetail from './views/WorldDetail.svelte'
@@ -48,12 +49,12 @@
 </script>
 
 {#if !ui}
-  <div class="loading"><div class="ember"></div></div>
+  <div class="loading"><Logo size={42} spin /></div>
 {:else}
   <div class="shell">
     <aside>
       <div class="brand">
-        <div class="ember small-ember"></div>
+        <Logo />
         <div>
           <div class="name">SaveRelay</div>
           <div class="faint small ellipsis">{ui.device.name}</div>
@@ -148,9 +149,6 @@
   main { overflow-y: auto; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .banner { display: flex; gap: 8px; flex-wrap: wrap; }
   .loading { height: 100%; display: grid; place-items: center; }
-  .ember { width: 42px; height: 42px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: radial-gradient(circle at 50% 65%, #ffd27a, #ff7a3d 55%, #d9481c); box-shadow: 0 0 24px #ff7a3d88; animation: pulse 2.4s ease-in-out infinite; }
-  .small-ember { width: 26px; height: 26px; animation: none; box-shadow: 0 0 14px #ff7a3d66; }
-  @keyframes pulse { 50% { box-shadow: 0 0 40px #ff7a3dcc; transform: scale(1.04); } }
   .toast { position: fixed; bottom: 20px; right: 20px; max-width: 420px; padding: 12px 16px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); box-shadow: 0 10px 30px #0008; }
   .toast.ok { border-color: color-mix(in srgb, var(--ok) 60%, var(--line)); }
   .toast.bad { border-color: var(--bad); }
