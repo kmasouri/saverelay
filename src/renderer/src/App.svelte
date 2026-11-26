@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { call, type AppState } from './lib/api'
+  import Icon from './lib/Icon.svelte'
   import Logo from './lib/Logo.svelte'
   import Overview from './views/Overview.svelte'
   import WorldDetail from './views/WorldDetail.svelte'
@@ -72,14 +73,17 @@
         <aside>
           <nav>
             <button class="nav" class:active={['overview', 'world', 'add'].includes(route.kind)} onclick={() => go({ kind: 'overview' })}>
+              <Icon name="games" />
               Saves
               {#if ui.invitations.length}<span class="count">{ui.invitations.length}</span>{/if}
             </button>
             <button class="nav" class:active={route.kind === 'friends'} onclick={() => go({ kind: 'friends' })}>
+              <Icon name="group" />
               Friends
               {#if ui.pendingDevices.length}<span class="count">{ui.pendingDevices.length}</span>{/if}
             </button>
             <button class="nav" class:active={route.kind === 'settings'} onclick={() => go({ kind: 'settings' })}>
+              <Icon name="settings" />
               Settings
               {#if ui.update.status === 'ready'}<span class="count">1</span>{/if}
             </button>
@@ -151,9 +155,11 @@
   .shell { display: grid; grid-template-columns: 260px 1fr; height: 100%; }
   aside { background: #130f15; border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 16px 10px; gap: 18px; min-height: 0; }
   nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; }
-  .nav { display: flex; align-items: center; gap: 8px; text-align: left; background: transparent; border: none; padding: 9px 10px; border-radius: 8px; font-weight: 500; }
+  .nav { display: flex; align-items: center; gap: 10px; text-align: left; background: transparent; border: none; padding: 9px 10px; border-radius: 8px; font-weight: 500; }
   .nav:hover:not(:disabled) { background: var(--panel); }
   .nav.active { background: var(--panel-2); }
+  .nav :global(.icon) { color: var(--muted); }
+  .nav.active :global(.icon) { color: var(--ember); }
   .count { margin-left: auto; background: var(--ember); color: #1b0f08; border-radius: 999px; font-size: 11px; padding: 0 7px; font-weight: 700; }
   .foot { display: flex; flex-direction: column; gap: 8px; padding: 0 8px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }

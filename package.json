@@ -20,6 +20,7 @@
     "electron-updater": "6.8.11"
   },
   "devDependencies": {
+    "@material-symbols/svg-400": "0.48.3",
     "@sveltejs/vite-plugin-svelte": "7.3.2",
     "@tsconfig/svelte": "5.0.9",
     "@types/node": "24.19.4",
