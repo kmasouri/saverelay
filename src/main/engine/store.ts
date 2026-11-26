@@ -7,7 +7,7 @@
 
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Transform } from 'node:stream'
@@ -42,8 +42,21 @@ export class WorldStore {
   async init(meta?: WorldMeta): Promise<void> {
     await mkdir(join(this.root, 'objects'), { recursive: true })
     await mkdir(join(this.root, 'events'), { recursive: true })
-    // Transport must never sync our temp files.
-    await writeFile(join(this.root, '.stignore'), `(?d)*${TMP_SUFFIX}\n`)
+    // Transport must never sync our temp files. Syncthing may mark this file hidden,
+    // and Windows refuses to recreate a hidden file, so leave it alone once it's right.
+    const ignore = join(this.root, '.stignore')
+    const want = `(?d)*${TMP_SUFFIX}\n`
+    const have = await readFile(ignore, 'utf8').catch(() => null)
+    if (have === null) await writeFile(ignore, want)
+    else if (have !== want) {
+      const fh = await open(ignore, 'r+')
+      try {
+        await fh.truncate(0)
+        await fh.write(want, 0)
+      } finally {
+        await fh.close()
+      }
+    }
     if (meta) await writeJsonAtomic(join(this.root, 'world.json'), meta)
   }
 
