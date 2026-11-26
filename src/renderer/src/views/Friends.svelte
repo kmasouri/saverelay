@@ -30,7 +30,7 @@
 
 <header class="stack tight">
   <h1>Friends</h1>
-  <p class="muted">Friends trust each other by swapping invite codes. Saves only travel between friends who added each other, and only for worlds you share with them.</p>
+  <p class="muted">Friends trust each other by swapping invite codes. Saves only travel between friends who added each other, and only for saves you share with them.</p>
 </header>
 
 <section class="two">

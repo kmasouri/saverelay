@@ -62,7 +62,7 @@
 
       <nav>
         <button class="nav" class:active={route.kind === 'overview'} onclick={() => go({ kind: 'overview' })}>
-          Worlds
+          Saves
           {#if ui.invitations.length}<span class="count">{ui.invitations.length}</span>{/if}
         </button>
         {#each ui.worlds as w (w.id)}
@@ -71,7 +71,7 @@
             <StatusBadge status={w.status} />
           </button>
         {/each}
-        <button class="nav sub add" class:active={route.kind === 'add'} onclick={() => go({ kind: 'add' })}>+ Share a world</button>
+        <button class="nav sub add" class:active={route.kind === 'add'} onclick={() => go({ kind: 'add' })}>+ Share a save</button>
         <button class="nav" class:active={route.kind === 'friends'} onclick={() => go({ kind: 'friends' })}>
           Friends
           {#if ui.pendingDevices.length}<span class="count">{ui.pendingDevices.length}</span>{/if}
@@ -110,7 +110,7 @@
             <WorldDetail world={currentWorld} {ui} {act} {go} />
           {/key}
         {:else}
-          <p class="muted">This world is no longer shared.</p>
+          <p class="muted">This save is no longer shared.</p>
         {/if}
       {:else if route.kind === 'add'}
         {#key route.folderId}

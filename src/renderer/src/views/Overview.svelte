@@ -8,10 +8,10 @@
 
 <header class="row spread">
   <div class="stack tight">
-    <h1>Shared worlds</h1>
-    <p class="muted">Play as usual through Steam or Ubisoft Connect. Saves hand off in the background.</p>
+    <h1>Shared saves</h1>
+    <p class="muted">Play as usual through Steam or Ubisoft Connect. They hand off in the background.</p>
   </div>
-  <button class="primary" onclick={() => go({ kind: 'add' })}>Share a world</button>
+  <button class="primary" onclick={() => go({ kind: 'add' })}>Share a save</button>
 </header>
 
 {#if ui.invitations.length}
@@ -31,15 +31,15 @@
 
 {#if ui.worlds.length === 0}
   <div class="card empty">
-    <h2>No shared worlds yet</h2>
+    <h2>No shared saves yet</h2>
     {#if ui.peers.length === 0}
-      <p class="muted">Start by adding your friends, then pick a world's save folder to share with them.</p>
+      <p class="muted">Start by adding your friends, then pick a save folder to share with them.</p>
       <div class="row">
         <button class="primary" onclick={() => go({ kind: 'friends' })}>Add friends</button>
-        <button onclick={() => go({ kind: 'add' })}>Share a world</button>
+        <button onclick={() => go({ kind: 'add' })}>Share a save</button>
       </div>
     {:else}
-      <p class="muted">Pick a game world to share, or wait for a friend's invitation to appear here.</p>
+      <p class="muted">Pick a save to share, or wait for a friend's invitation to appear here.</p>
     {/if}
   </div>
 {:else}

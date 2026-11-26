@@ -443,7 +443,7 @@ export class Engine extends EventEmitter {
     if (res.state === 'conflict') {
       rt.pendingUpdate = false
       this.setStatus(w.id, 'conflict', `${res.candidates.length} competing versions need a choice.`)
-      this.notifyOnce(w.id, `conflict-${res.headIds.join(',')}`, `${w.name}: choose a version`, 'Friends continued the world separately. Open SaveRelay to pick which continuation to keep. Both are preserved.')
+      this.notifyOnce(w.id, `conflict-${res.headIds.join(',')}`, `${w.name}: choose a version`, 'Friends continued this save separately. Open SaveRelay to pick which continuation to keep. Both are preserved.')
       return
     }
 
@@ -556,7 +556,7 @@ export class Engine extends EventEmitter {
       if (w.id === ignoreWorldId) continue
       const other = await realpath(w.localPath).catch(() => w.localPath)
       if (other === real || real.startsWith(other + '/') || real.startsWith(other + '\\') || other.startsWith(real + '/') || other.startsWith(real + '\\')) {
-        throw new Error(`That folder overlaps the shared world “${w.name}”.`)
+        throw new Error(`That folder overlaps the shared save “${w.name}”.`)
       }
     }
     if (real.startsWith(resolvePath(this.deps.dataDir))) throw new Error('Choose your game’s save folder, not SaveRelay’s own data folder.')
@@ -585,7 +585,7 @@ export class Engine extends EventEmitter {
     const list = (v: unknown, max: number): string[] =>
       Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string').map((s) => s.trim()).filter(Boolean).slice(0, max) : []
     const name = String(input.name ?? '').trim().slice(0, 80)
-    if (!name) throw new Error('Give the world a name.')
+    if (!name) throw new Error('Give the save a name.')
     const include = list(input.include, 20)
     for (const g of [...include, ...list(input.exclude, 20)]) globToRegExp(g)
     return {

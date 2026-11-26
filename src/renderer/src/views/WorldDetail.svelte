@@ -32,7 +32,7 @@
   }
 
   async function restore(g: HistoryGroup): Promise<void> {
-    const ok = confirm(`Restore the version from ${exact(g.modifiedAt)}?\n\nIt becomes the shared world for everyone. Current saves are backed up first and stay in history.`)
+    const ok = confirm(`Restore the version from ${exact(g.modifiedAt)}?\n\nIt becomes the shared save for everyone. Current saves are backed up first and stay in history.`)
     if (ok) await act(() => call('restore', world.id, g.contentId), 'Restore recorded. It applies once the game is closed.')
   }
 
@@ -67,7 +67,7 @@
       <h1 class="ellipsis">{world.name}</h1>
       <StatusBadge status={world.status} />
     </div>
-    <p class="muted">{world.detail || (world.status === 'up-to-date' ? 'Everyone online has the same world.' : '')}</p>
+    <p class="muted">{world.detail || (world.status === 'up-to-date' ? 'Everyone online has the same save.' : '')}</p>
   </div>
   <div class="row">
     <button onclick={() => act(() => call('openPath', world.localPath))}>Open folder</button>
@@ -82,7 +82,7 @@
 {#if world.conflict}
   <section class="card alert stack">
     <div class="stack tight">
-      <h2>Friends continued this world separately</h2>
+      <h2>Friends continued this save separately</h2>
       <p class="muted">Pick the continuation everyone should keep playing. Nothing is merged and nothing is deleted: the other version stays in history and can be restored later.</p>
     </div>
     <div class="cands">
@@ -116,7 +116,7 @@
     {/if}
     <p class="faint small">
       {#if world.policy.policy === 'latest-modified'}
-        The save with the newest in-game save time wins. A re-saved old world or a wrong PC clock can win too. The other version is always kept in history.
+        The save with the newest in-game save time wins. A re-saved old game or a wrong PC clock can win too. The other version is always kept in history.
       {:else if world.policy.policy === 'ask'}
         Both versions are kept and you pick one. Ordinary hand-offs never ask.
       {:else}
@@ -130,7 +130,7 @@
   <div class="card stack">
     <h2>Shared with</h2>
     {#if ui.peers.length === 0}
-      <p class="muted small">Add friends on the Friends page to share this world.</p>
+      <p class="muted small">Add friends on the Friends page to share this save.</p>
     {/if}
     {#each ui.peers as p (p.deviceId)}
       <label class="check">
@@ -206,7 +206,7 @@
 
 <section class="card danger row spread">
   <div class="stack tight">
-    <h3>Stop sharing this world</h3>
+    <h3>Stop sharing this save</h3>
     <p class="small muted">Leaves your saves and history in place.</p>
   </div>
   <button class="danger" onclick={stopSharing}>Stop sharing</button>

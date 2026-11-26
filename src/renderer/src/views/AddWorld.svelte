@@ -20,11 +20,12 @@
   let exclude = $state('')
   let sharedWith = $state<string[]>([])
   let mode = $state<'receive' | 'contribute'>('receive')
-  let confirmed = $state(false)
+  let advanced = $state(false)
   let busy = $state(false)
 
   onMount(async () => {
     if (invitation) name = invitation.label
+    sharedWith = ui.peers.map((p) => p.deviceId)
     discovered = (await act(() => call<Discovered[]>('discover'))) ?? []
     scanning = false
   })
@@ -32,26 +33,26 @@
   function applyGame(id: string): void {
     gameId = id
     const g = ui.games.find((x) => x.id === id)
-    if (g) {
-      processes = g.processNames.join(', ')
-      include = g.include.join(', ')
-      exclude = g.exclude.join(', ')
-    }
+    processes = g ? g.processNames.join(', ') : ''
+    include = g ? g.include.join(', ') : '**/*'
+    exclude = g ? g.exclude.join(', ') : ''
   }
 
   async function choose(p: string, preset?: Discovered): Promise<void> {
     path = p
-    confirmed = false
-    if (preset) {
-      applyGame(preset.gameId)
-      if (!joining) name = preset.name
-    }
+    applyGame(preset?.gameId ?? 'custom')
+    if (!joining) name = preset?.name ?? p.split(/[\\/]/).filter(Boolean).at(-1) ?? ''
     warnings = (await act(() => call<string[]>('folderWarnings', p))) ?? []
   }
 
   async function browse(): Promise<void> {
     const p = await act(() => call<string | null>('pickFolder'))
     if (p) await choose(p)
+  }
+
+  async function pickExe(): Promise<void> {
+    const exe = await act(() => call<string | null>('pickExe'))
+    if (exe) processes = exe
   }
 
   async function submit(): Promise<void> {
@@ -66,125 +67,98 @@
       sharedWith: $state.snapshot(sharedWith),
       mode,
     }
-    const w = joining
-      ? await act(() => call<World>('joinWorld', folderId, input), `Joined ${name}`)
-      : await act(() => call<World>('addWorld', input), `Now sharing ${name}`)
+    const w = joining ? await act(() => call<World>('joinWorld', folderId, input), `Joined ${name}`) : await act(() => call<World>('addWorld', input), `Now sharing ${name}`)
     busy = false
     if (w) go({ kind: 'world', id: w.id })
   }
 
-  const game = $derived(ui.games.find((g) => g.id === gameId))
-  const valid = $derived(!!path && !!name.trim() && confirmed)
+  const gameName = (id: string): string => ui.games.find((g) => g.id === id)?.name ?? 'Other game'
 </script>
 
 <header class="stack tight">
-  <h1>{joining ? `Join “${invitation?.label ?? 'shared world'}”` : 'Share a world'}</h1>
-  <p class="muted">
-    {#if joining}
-      Shared by {invitation?.offeredBy.join(', ')}. Choose where this world's saves live on <em>this</em> PC; your folder can differ from your friends'.
-    {:else}
-      Pick one world's save folder. Only that folder is shared, and only with the friends you tick below.
-    {/if}
-  </p>
+  <h1>{joining ? `Join “${invitation?.label ?? 'shared save'}”` : 'Share a save'}</h1>
+  {#if joining && invitation}<p class="muted">From {invitation.offeredBy.join(', ')}. Pick where it goes on this PC.</p>{/if}
 </header>
 
 {#if joining && !invitation}
   <div class="card danger">This invitation is no longer pending.</div>
+{:else if !path}
+  <section class="stack">
+    {#if scanning}
+      <p class="muted small">Looking for games…</p>
+    {:else}
+      {#each discovered as d (d.path)}
+        <button class="pick" disabled={d.added} title={d.path} onclick={() => choose(d.path, d)}>
+          <span class="badge plain ember">{d.gameName}</span>
+          <strong class="grow ellipsis">{d.name}</strong>
+          <span class="faint small">{d.added ? 'already shared' : 'Select'}</span>
+        </button>
+      {/each}
+    {/if}
+    <button class="pick other" onclick={browse}>
+      <strong class="grow">Other game…</strong>
+      <span class="faint small">Choose its save folder</span>
+    </button>
+  </section>
 {:else}
   <section class="card stack">
-    <h2>1. Save folder</h2>
-    {#if scanning}
-      <p class="muted small">Looking for known games…</p>
-    {:else if discovered.length}
-      <div class="stack tight">
-        <span class="muted small">Detected worlds</span>
-        {#each discovered as d (d.path)}
-          <button class="pick" class:selected={path === d.path} disabled={d.added} onclick={() => choose(d.path, d)}>
-            <span class="badge plain ember">{d.gameName}</span>
-            <strong>{d.name}</strong>
-            <span class="mono faint ellipsis grow">{d.path}</span>
-            {#if d.added}<span class="faint small">already shared</span>{/if}
-          </button>
-        {/each}
-      </div>
-    {:else}
-      <p class="muted small">No known game worlds were detected on this PC. Browse to the folder instead.</p>
-    {/if}
     <div class="row">
-      <button onclick={browse}>Browse for a folder…</button>
-      {#if path}<span class="mono ellipsis grow">{path}</span>{/if}
+      <span class="badge plain ember">{gameName(gameId)}</span>
+      <input class="grow" bind:value={name} maxlength="80" aria-label="Name" />
     </div>
-    {#each warnings as w}
-      <div class="card alert small">{w}</div>
-    {/each}
-  </section>
+    <span class="mono faint ellipsis" title={path}>{path}</span>
 
-  {#if path}
-    <section class="card stack">
-      <h2>2. Details</h2>
-      <div class="cols">
-        <label class="field"><span>World name</span><input bind:value={name} maxlength="80" /></label>
-        <label class="field">
-          <span>Game</span>
-          <select value={gameId} onchange={(e) => applyGame(e.currentTarget.value)}>
-            {#each ui.games as g}<option value={g.id}>{g.name}</option>{/each}
-            <option value="custom">Other / custom</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Game process names (comma separated)</span>
-          <input bind:value={processes} placeholder="Game.exe" />
-        </label>
-        <label class="field">
-          <span>Files to include</span>
-          <input bind:value={include} placeholder="**/*" />
-        </label>
-        <label class="field">
-          <span>Files to exclude</span>
-          <input bind:value={exclude} placeholder="settings.ini" />
-        </label>
+    {#if !processes.trim()}
+      <div class="card alert row spread small">
+        <span>Pick the game's .exe so SaveRelay knows when you're playing.</span>
+        <button onclick={pickExe}>Choose .exe…</button>
       </div>
-      {#if game}<p class="faint small">{game.notes}</p>{/if}
-      {#if !processes.trim()}
-        <p class="small" style="color: var(--warn)">Without a process name, SaveRelay can't tell when the game is running, and may apply updates while you play.</p>
-      {/if}
+    {/if}
+    {#each warnings as w}<div class="card alert small">{w}</div>{/each}
 
-      {#if joining}
-        <div class="stack tight">
-          <span class="muted small">If this folder already has saves</span>
-          <label class="check"><input type="radio" bind:group={mode} value="receive" /> Back them up and use the shared world (recommended)</label>
-          <label class="check"><input type="radio" bind:group={mode} value="contribute" /> Share them too, as a competing version</label>
-        </div>
-      {/if}
-
-      <div class="stack tight">
-        <span class="muted small">{joining ? 'Also share with' : 'Share with'}</span>
-        {#if ui.peers.length === 0}
-          <p class="small muted">No friends yet. <button class="link" onclick={() => go({ kind: 'friends' })}>Add friends</button> first, or share now and add them later.</p>
-        {/if}
+    {#if ui.peers.length}
+      <div class="row wrap">
+        <span class="muted small">Share with</span>
         {#each ui.peers as p (p.deviceId)}
           <label class="check"><input type="checkbox" bind:group={sharedWith} value={p.deviceId} /> {p.name}</label>
         {/each}
       </div>
-    </section>
+    {:else}
+      <p class="small muted">No friends yet. You can <button class="link" onclick={() => go({ kind: 'friends' })}>add them</button> later.</p>
+    {/if}
 
-    <section class="card stack">
-      <h2>3. Confirm</h2>
-      <label class="check">
-        <input type="checkbox" bind:checked={confirmed} />
-        <span>Share the save files in <span class="mono">{path}</span>{exclude.trim() ? `, excluding ${exclude}` : ''}.</span>
-      </label>
-      <p class="faint small">Your existing saves are never moved or deleted. Before any update replaces them, they're backed up.</p>
-      <div class="row">
-        <button class="primary" disabled={!valid || busy} onclick={submit}>{joining ? 'Join world' : 'Start sharing'}</button>
-        <button class="ghost" onclick={() => go({ kind: 'overview' })}>Cancel</button>
+    {#if joining}<p class="faint small">Saves already in this folder are backed up first.</p>{/if}
+
+    <button class="ghost adv" onclick={() => (advanced = !advanced)}>{advanced ? '▾' : '▸'} Advanced</button>
+    {#if advanced}
+      <div class="cols">
+        <label class="field"><span>Game program(s)</span>
+          <div class="row"><input bind:value={processes} placeholder="Game.exe" /><button onclick={pickExe}>…</button></div>
+        </label>
+        <label class="field"><span>Include files</span><input bind:value={include} placeholder="**/*" /></label>
+        <label class="field"><span>Exclude files</span><input bind:value={exclude} /></label>
+        {#if joining}
+          <label class="field"><span>Existing saves in this folder</span>
+            <select bind:value={mode}>
+              <option value="receive">Back up and replace with the shared save</option>
+              <option value="contribute">Share them too, as a competing version</option>
+            </select>
+          </label>
+        {/if}
       </div>
-    </section>
-  {/if}
+    {/if}
+
+    <div class="row">
+      <button class="primary" disabled={!name.trim() || busy} onclick={submit}>{joining ? 'Join' : 'Share'}</button>
+      <button class="ghost" onclick={() => (path = '')}>Back</button>
+    </div>
+  </section>
 {/if}
 
 <style>
-  .pick { display: flex; gap: 10px; align-items: center; text-align: left; }
-  .pick.selected { border-color: var(--ember); background: color-mix(in srgb, var(--ember) 8%, var(--panel-2)); }
+  .pick { display: flex; gap: 10px; align-items: center; text-align: left; padding: 12px 14px; }
+  .pick:hover:not(:disabled) { border-color: var(--ember); }
+  .pick.other { border-style: dashed; }
+  .adv { align-self: flex-start; padding-left: 0; }
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 </style>

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, shell, Tray, type IpcMainInvokeEvent } from 'electron'
 import { existsSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadConfig } from './engine/config'
 import { Engine, type NewWorldInput } from './engine/engine'
@@ -161,6 +161,10 @@ async function main(): Promise<void> {
     pickFolder: async () => {
       const res = await dialog.showOpenDialog(win!, { properties: ['openDirectory'], title: 'Choose the save folder for this world' })
       return res.canceled ? null : res.filePaths[0]
+    },
+    pickExe: async () => {
+      const res = await dialog.showOpenDialog(win!, { properties: ['openFile'], title: 'Choose the game program', filters: [{ name: 'Programs', extensions: process.platform === 'win32' ? ['exe'] : ['*'] }] })
+      return res.canceled ? null : basename(res.filePaths[0])
     },
     folderWarnings: (p) => engine.folderWarnings(str(p)),
     setDeviceName: (name) => engine.setDeviceName(str(name, 64)),
