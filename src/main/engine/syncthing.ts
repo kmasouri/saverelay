@@ -21,7 +21,7 @@ export interface PendingFolder {
   offeredBy: string[]
 }
 
-export const FOLDER_PREFIX = 'calm-ember-'
+export const FOLDER_PREFIX = 'saverelay-'
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -148,7 +148,7 @@ export class Syncthing {
     const id = FOLDER_PREFIX + worldId
     await this.request('PUT', `/rest/config/folders/${encodeURIComponent(id)}`, {
       id,
-      label: `Calm Ember: ${label}`,
+      label: `SaveRelay: ${label}`,
       path,
       type: 'sendreceive',
       devices: [this.myId, ...deviceIds].map((d) => ({ deviceID: d })),
@@ -177,7 +177,7 @@ export class Syncthing {
       .map(([folderId, v]) => ({
         folderId,
         offeredBy: Object.keys(v.offeredBy ?? {}),
-        label: Object.values(v.offeredBy ?? {})[0]?.label?.replace(/^Calm Ember: /, '') ?? 'Shared world',
+        label: Object.values(v.offeredBy ?? {})[0]?.label?.replace(/^SaveRelay: /, '') ?? 'Shared world',
       }))
   }
 

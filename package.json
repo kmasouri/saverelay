@@ -1,6 +1,6 @@
 {
-  "name": "calm-ember",
-  "productName": "Calm Ember",
+  "name": "saverelay",
+  "productName": "SaveRelay",
   "version": "0.1.0",
   "description": "Automatic game save sharing between trusted friends",
   "author": "Kayvan Masouri",

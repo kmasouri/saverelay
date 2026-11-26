@@ -49,7 +49,7 @@
 
   <div class="card stack">
     <h2>Add a friend</h2>
-    <textarea class="mono" rows="4" placeholder="Paste your friend's code (starts with ce1:)" bind:value={code}></textarea>
+    <textarea class="mono" rows="4" placeholder="Paste your friend's code (starts with sr1:)" bind:value={code}></textarea>
     <div class="row">
       <button class="primary" disabled={!code.trim()} onclick={add}>Add friend</button>
     </div>

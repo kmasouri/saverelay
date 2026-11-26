@@ -32,7 +32,7 @@ export class Updater extends EventEmitter {
     autoUpdater.on('download-progress', (p) => this.set({ ...this.state, status: 'downloading', progress: Math.round(p.percent) }))
     autoUpdater.on('update-downloaded', (info) => {
       this.set({ status: 'ready', version: info.version, checkedAt: Date.now() })
-      new Notification({ title: 'Calm Ember update ready', body: `Version ${info.version} installs the next time Calm Ember restarts.` }).show()
+      new Notification({ title: 'SaveRelay update ready', body: `Version ${info.version} installs the next time SaveRelay restarts.` }).show()
     })
     autoUpdater.on('error', (err) => this.set({ status: 'error', error: err?.message ?? String(err), checkedAt: Date.now() }))
   }

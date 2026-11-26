@@ -31,7 +31,7 @@
   <p class="faint small">Friends see the name from the invite code they pasted. A new name shows on versions you publish from now on.</p>
   <label class="check">
     <input type="checkbox" checked={ui.device.startAtLogin} onchange={(e) => act(() => call('setStartAtLogin', e.currentTarget.checked))} />
-    Start Calm Ember in the tray when I sign in (recommended, so saves sync without you opening it)
+    Start SaveRelay in the tray when I sign in (recommended, so saves sync without you opening it)
   </label>
 </section>
 
@@ -39,12 +39,12 @@
   <h2>Updates</h2>
   <div class="row spread">
     <div class="stack tight">
-      <span>Calm Ember {ui.app.version}</span>
+      <span>SaveRelay {ui.app.version}</span>
       <span class="small muted">
         {#if u.status === 'disabled'}Updates are off in development builds.
         {:else if u.status === 'checking'}Checking for updates…
         {:else if u.status === 'downloading'}Downloading {u.version} in the background… {u.progress ?? 0}%
-        {:else if u.status === 'ready'}Version {u.version} is ready. It installs when Calm Ember restarts.
+        {:else if u.status === 'ready'}Version {u.version} is ready. It installs when SaveRelay restarts.
         {:else if u.status === 'up-to-date'}You're up to date (checked {when(u.checkedAt ?? 0)}).
         {:else if u.status === 'error'}Update check failed: {u.error}
         {:else}Updates download automatically in the background.{/if}

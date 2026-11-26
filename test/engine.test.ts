@@ -75,7 +75,7 @@ class FakeNet {
 
 async function copyMissing(from: string, to: string): Promise<void> {
   for (const entry of await readdir(from, { withFileTypes: true })) {
-    if (entry.name.endsWith('.ce-tmp') || entry.name === '.stignore') continue
+    if (entry.name.endsWith('.sr-tmp') || entry.name === '.stignore') continue
     const s = join(from, entry.name)
     const d = join(to, entry.name)
     if (entry.isDirectory()) {
@@ -141,7 +141,7 @@ async function rounds(n = 8): Promise<void> {
 const world = (d: Device) => d.engine.snapshot().worlds[0]
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'calm-ember-'))
+  root = await mkdtemp(join(tmpdir(), 'saverelay-'))
   net = new FakeNet()
   clock = 1_700_000_000_000
   notes.length = 0

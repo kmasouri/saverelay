@@ -51,7 +51,7 @@ describe.skipIf(!BIN)('real Syncthing transport', () => {
   })
 
   it('pairs two devices, offers a world, and hands off a save', { timeout: 300_000 }, async () => {
-    const root = await mkdtemp(join(tmpdir(), 'calm-ember-st-'))
+    const root = await mkdtemp(join(tmpdir(), 'saverelay-st-'))
     cleanup.push(() => rm(root, { recursive: true, force: true }))
 
     const make = async (name: string) => {

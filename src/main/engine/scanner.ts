@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { isIncluded, normalizeRelPath } from '../../core/paths'
 import { MAX_FILES_PER_SNAPSHOT } from '../../core/validate'
 
-export const TMP_SUFFIX = '.ce-tmp'
+export const TMP_SUFFIX = '.sr-tmp'
 
 export interface ScannedFile {
   path: string

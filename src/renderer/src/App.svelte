@@ -39,7 +39,7 @@
 
   onMount(() => {
     void call<AppState>('getState').then((s) => (ui = s))
-    return window.ce.onState((s) => (ui = s))
+    return window.sr.onState((s) => (ui = s))
   })
 
   const selectedWorldId = $derived(route.kind === 'world' ? route.id : null)
@@ -55,7 +55,7 @@
       <div class="brand">
         <div class="ember small-ember"></div>
         <div>
-          <div class="name">Calm Ember</div>
+          <div class="name">SaveRelay</div>
           <div class="faint small ellipsis">{ui.device.name}</div>
         </div>
       </div>

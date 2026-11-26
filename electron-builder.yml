@@ -1,5 +1,5 @@
-appId: com.kmasouri.calmember
-productName: Calm Ember
+appId: com.kmasouri.saverelay
+productName: SaveRelay
 copyright: Copyright © 2026 Kayvan Masouri
 directories:
   output: dist
@@ -17,7 +17,7 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  artifactName: CalmEmber-Setup-${version}.${ext}
+  artifactName: SaveRelay-Setup-${version}.${ext}
 nsis:
   # Per-user, no admin prompt: updates install silently in the background like Discord.
   oneClick: true
@@ -25,7 +25,7 @@ nsis:
   allowElevation: false
   differentialPackage: true
   deleteAppDataOnUninstall: false
-  shortcutName: Calm Ember
+  shortcutName: SaveRelay
 mac:
   target: [dmg]
   category: public.app-category.games
@@ -35,5 +35,5 @@ linux:
 publish:
   provider: github
   owner: kmasouri
-  repo: calm-ember-releases
+  repo: saverelay
   releaseType: release

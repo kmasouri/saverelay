@@ -443,7 +443,7 @@ export class Engine extends EventEmitter {
     if (res.state === 'conflict') {
       rt.pendingUpdate = false
       this.setStatus(w.id, 'conflict', `${res.candidates.length} competing versions need a choice.`)
-      this.notifyOnce(w.id, `conflict-${res.headIds.join(',')}`, `${w.name}: choose a version`, 'Friends continued the world separately. Open Calm Ember to pick which continuation to keep. Both are preserved.')
+      this.notifyOnce(w.id, `conflict-${res.headIds.join(',')}`, `${w.name}: choose a version`, 'Friends continued the world separately. Open SaveRelay to pick which continuation to keep. Both are preserved.')
       return
     }
 
@@ -559,7 +559,7 @@ export class Engine extends EventEmitter {
         throw new Error(`That folder overlaps the shared world “${w.name}”.`)
       }
     }
-    if (real.startsWith(resolvePath(this.deps.dataDir))) throw new Error('Choose your game’s save folder, not Calm Ember’s own data folder.')
+    if (real.startsWith(resolvePath(this.deps.dataDir))) throw new Error('Choose your game’s save folder, not SaveRelay’s own data folder.')
     return abs
   }
 

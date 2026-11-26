@@ -114,7 +114,7 @@ export interface WorldInput {
 
 declare global {
   interface Window {
-    ce: {
+    sr: {
       invoke(name: string, ...args: unknown[]): Promise<unknown>
       onState(cb: (state: AppState) => void): () => void
     }
@@ -122,7 +122,7 @@ declare global {
 }
 
 export function call<T = void>(name: string, ...args: unknown[]): Promise<T> {
-  return window.ce.invoke(name, ...args) as Promise<T>
+  return window.sr.invoke(name, ...args) as Promise<T>
 }
 
 export const STATUS_LABEL: Record<WorldStatus, string> = {

@@ -11,7 +11,7 @@ import { createLogger } from './logger'
 import { Updater } from './updater'
 import type { Policy } from '../core/types'
 
-const APP_ID = 'com.kmasouri.calmember'
+const APP_ID = 'com.kmasouri.saverelay'
 const here = dirname(fileURLToPath(import.meta.url))
 
 if (!app.requestSingleInstanceLock()) {
@@ -27,7 +27,7 @@ async function main(): Promise<void> {
   const dataDir = app.getPath('userData')
   const logger = createLogger(join(dataDir, 'logs'))
   const log = logger.log
-  log(`Calm Ember ${app.getVersion()} starting on ${process.platform}-${process.arch}`)
+  log(`SaveRelay ${app.getVersion()} starting on ${process.platform}-${process.arch}`)
 
   const resources = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
   const exe = process.platform === 'win32' ? 'syncthing.exe' : 'syncthing'
@@ -77,7 +77,7 @@ async function main(): Promise<void> {
       minWidth: 820,
       minHeight: 560,
       show: false,
-      title: 'Calm Ember',
+      title: 'SaveRelay',
       backgroundColor: '#17131a',
       icon: join(resources, 'icon.png'),
       autoHideMenuBar: true,
@@ -115,13 +115,13 @@ async function main(): Promise<void> {
 
   const trayImage = nativeImage.createFromPath(join(resources, 'tray.png'))
   const tray = new Tray(trayImage)
-  tray.setToolTip('Calm Ember')
+  tray.setToolTip('SaveRelay')
   const buildTrayMenu = (): void => {
     const snap = engine.snapshot()
     const worldItems = snap.worlds.map((w) => ({ label: `${w.name}: ${w.status.replace(/-/g, ' ')}`, enabled: false }))
     tray.setContextMenu(
       Menu.buildFromTemplate([
-        { label: 'Open Calm Ember', click: showWindow },
+        { label: 'Open SaveRelay', click: showWindow },
         { type: 'separator' },
         ...(worldItems.length ? worldItems : [{ label: 'No shared worlds yet', enabled: false }]),
         { type: 'separator' },
@@ -143,7 +143,7 @@ async function main(): Promise<void> {
     pushTimer = setTimeout(() => {
       pushTimer = null
       buildTrayMenu()
-      if (win && !win.isDestroyed()) win.webContents.send('ce:state', fullState())
+      if (win && !win.isDestroyed()) win.webContents.send('sr:state', fullState())
     }, 150)
   }
   engine.on('change', push)
@@ -185,7 +185,7 @@ async function main(): Promise<void> {
       if (allowed) await shell.openPath(path)
     },
     exportDiagnostics: async () => {
-      const res = await dialog.showSaveDialog(win!, { defaultPath: `calm-ember-diagnostics-${Date.now()}.json` })
+      const res = await dialog.showSaveDialog(win!, { defaultPath: `saverelay-diagnostics-${Date.now()}.json` })
       if (res.canceled || !res.filePath) return null
       await writeFile(res.filePath, JSON.stringify({ ...(await engine.diagnostics()), app: app.getVersion(), update: updater.state, log: logger.recent() }, null, 2))
       return res.filePath
@@ -197,7 +197,7 @@ async function main(): Promise<void> {
     const url = e.senderFrame?.url ?? ''
     return url.startsWith('file://') || (!!process.env.ELECTRON_RENDERER_URL && url.startsWith(process.env.ELECTRON_RENDERER_URL))
   }
-  ipcMain.handle('ce:invoke', async (e, name: unknown, ...args: unknown[]) => {
+  ipcMain.handle('sr:invoke', async (e, name: unknown, ...args: unknown[]) => {
     if (!trusted(e) || typeof name !== 'string' || !Object.hasOwn(handlers, name)) throw new Error('Not allowed')
     try {
       const result = await handlers[name](...args)

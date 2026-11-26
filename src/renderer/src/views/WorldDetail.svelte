@@ -95,7 +95,7 @@
         </div>
       {/each}
     </div>
-    <p class="faint small">Different file contents don't always mean different progress: multiplayer saves can differ in player-specific details. Calm Ember can't tell yet, so it asks.</p>
+    <p class="faint small">Different file contents don't always mean different progress: multiplayer saves can differ in player-specific details. SaveRelay can't tell yet, so it asks.</p>
   </section>
 {/if}
 

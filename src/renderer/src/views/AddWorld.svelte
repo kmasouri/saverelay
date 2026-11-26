@@ -146,7 +146,7 @@
       </div>
       {#if game}<p class="faint small">{game.notes}</p>{/if}
       {#if !processes.trim()}
-        <p class="small" style="color: var(--warn)">Without a process name, Calm Ember can't tell when the game is running, and may apply updates while you play.</p>
+        <p class="small" style="color: var(--warn)">Without a process name, SaveRelay can't tell when the game is running, and may apply updates while you play.</p>
       {/if}
 
       {#if joining}

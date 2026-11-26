@@ -1,7 +1,9 @@
 name: Release
 
-# Push a tag like v0.1.1 (npm version patch && git push --follow-tags) to build
-# the Windows installer. Installed copies pick the update up automatically.
+# Push a tag like v0.1.2 (npm version patch && git push --follow-tags) to build the
+# Windows installer and publish it as a GitHub release of this repo. Installed copies
+# read that release feed and update themselves in the background.
+# Manual runs build and test the installer without publishing.
 on:
   push:
     tags: ['v*']
@@ -13,8 +15,6 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
-    env:
-      RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,15 +26,7 @@ jobs:
       - run: npm test
       - run: node scripts/fetch-syncthing.mjs win32 x64
       - run: npm run build
-
-      # Public, binaries-only update feed (see README). Skipped until the token exists.
-      - name: Build and publish to the update feed
-        if: ${{ env.RELEASES_TOKEN != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-        run: npx electron-builder --win --x64 --publish always
-      - name: Build without publishing
-        if: ${{ env.RELEASES_TOKEN == '' }}
+      - name: Package installer
         run: npx electron-builder --win --x64 --publish never
 
       - name: Verify the packaged app
@@ -48,8 +40,8 @@ jobs:
       - name: Smoke test the packaged app
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "dist/win-unpacked/Calm Ember.exe" -ArgumentList "--hidden" -PassThru
-          $log = Join-Path $env:APPDATA "Calm Ember/logs/main.log"
+          $p = Start-Process -FilePath "dist/win-unpacked/SaveRelay.exe" -ArgumentList "--hidden" -PassThru
+          $log = Join-Path $env:APPDATA "SaveRelay/logs/main.log"
           $ok = $false
           for ($i = 0; $i -lt 60; $i++) {
             Start-Sleep -Seconds 2
@@ -57,25 +49,25 @@ jobs:
           }
           Start-Sleep -Seconds 5
           if (Test-Path $log) { Get-Content $log | Select-Object -Last 40 }
-          Get-Process -Name "Calm Ember","syncthing" -ErrorAction SilentlyContinue | Stop-Process -Force
+          Get-Process -Name "SaveRelay","syncthing" -ErrorAction SilentlyContinue | Stop-Process -Force
           if (-not $ok) { throw "App did not start Syncthing" }
           if (Select-String -Path $log -Pattern "failed|exited unexpectedly" -Quiet) { throw "Errors in startup log" }
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CalmEmber-windows
+          name: SaveRelay-windows
           path: |
             dist/*.exe
             dist/*.blockmap
             dist/latest.yml
 
-      - name: Attach installer to a release in this repo
+      # Only after the smoke test passes: the installer, blockmap and latest.yml form the update feed.
+      - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.exe dist/latest.yml \
-            --repo "$GITHUB_REPOSITORY" --title "Calm Ember $GITHUB_REF_NAME" \
-            --notes "Windows installer. Download CalmEmber-Setup-*.exe and run it." \
-            || gh release upload "$GITHUB_REF_NAME" dist/*.exe dist/latest.yml --repo "$GITHUB_REPOSITORY" --clobber
+          gh release create "$GITHUB_REF_NAME" dist/*.exe dist/*.blockmap dist/latest.yml \
+            --repo "$GITHUB_REPOSITORY" --title "SaveRelay $GITHUB_REF_NAME" \
+            --notes "Windows installer: download SaveRelay-Setup-*.exe and run it. Installed copies update automatically."

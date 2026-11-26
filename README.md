@@ -1,32 +1,26 @@
-# Calm Ember
+# SaveRelay
 
-Automatic game save sharing between trusted friends. Anyone can continue a shared world, and the others get the update automatically when they're back online. Launch games the way you always do (Steam, Ubisoft Connect, shortcuts). Calm Ember runs in the tray.
+Automatic game save sharing between trusted friends. Anyone can continue a shared world, and the others get the update automatically when they're back online. Launch games the way you always do (Steam, Ubisoft Connect, shortcuts). SaveRelay runs in the tray.
 
 It implements the first testable slice of the *PRD — Automatic Game Save Sharing* (Notion). Stack: Svelte 5 + TypeScript + Electron.
 
 ## Install (Windows)
 
-1. Open the latest release (in this repo's **Releases**, or the **Release** workflow's `CalmEmber-windows` artifact).
-2. Download `CalmEmber-Setup-<version>.exe` and run it. It installs per-user, so no admin prompt.
+1. Open the [latest release](https://github.com/kmasouri/saverelay/releases/latest).
+2. Download `SaveRelay-Setup-<version>.exe` and run it. It installs per-user, so no admin prompt.
 3. The build is unsigned, so Windows SmartScreen will warn you. Choose **More info → Run anyway**.
 
 ### Updates
 
-Like Discord, Calm Ember checks for updates in the background every few hours. It downloads only what changed (differential NSIS update), and switches to the new version the next time it restarts. Settings and the tray menu show a **Restart to update** button once an update is ready.
+Like Discord, SaveRelay checks for updates in the background every few hours. It downloads only what changed (differential NSIS update), and switches to the new version the next time it restarts. Settings and the tray menu show a **Restart to update** button once an update is ready.
 
-The update feed is the public, binaries-only repo `kmasouri/calm-ember-releases`, so friends' installs can update without a GitHub login. The source stays private. To turn it on:
-
-1. Create the public repo `kmasouri/calm-ember-releases` (it can stay empty).
-2. Create a fine-grained token with **Contents: read & write** on that repo only.
-3. Add the token to this repo's secrets as `RELEASES_TOKEN`.
-
-Until then, release builds still work and are attached to this repo's Releases, but installed apps can't see the updates.
+Updates come from this repo's GitHub Releases, so installs need no GitHub login.
 
 ### Shipping a new version
 
 ```sh
 npm version patch        # bumps package.json and creates the tag
-git push --follow-tags   # the Release workflow builds Windows and publishes the update
+git push --follow-tags   # Release workflow: build, smoke test, publish the update
 ```
 
 ## Using it
@@ -60,7 +54,7 @@ src/renderer/  Svelte UI
 - **Transport** is a bundled, private [Syncthing](https://syncthing.net) instance (authenticated TLS, NAT traversal, relays). It only syncs the app's staging store, never your live save folder. Folder offers are never auto-accepted.
 - **Applying** an update verifies every hash, backs up the live files, writes through a journal, and preserves original modification times. A crash mid-apply is rolled back on next start.
 
-Data lives in `%APPDATA%\Calm Ember\`: `config.json`, `staging\`, `backups\`, `logs\`.
+Data lives in `%APPDATA%\SaveRelay\`: `config.json`, `staging\`, `backups\`, `logs\`.
 
 ## Development
 

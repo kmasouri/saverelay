@@ -44,12 +44,12 @@ export interface Invite {
 }
 
 export function encodeInvite(invite: Invite): string {
-  return 'ce1:' + Buffer.from(JSON.stringify(invite)).toString('base64url')
+  return 'sr1:' + Buffer.from(JSON.stringify(invite)).toString('base64url')
 }
 
 export function decodeInvite(code: string): Invite | null {
   const trimmed = code.trim()
-  if (!trimmed.startsWith('ce1:')) return null
+  if (!trimmed.startsWith('sr1:')) return null
   try {
     const raw = JSON.parse(Buffer.from(trimmed.slice(4), 'base64url').toString('utf8'))
     if (raw?.v !== 1) return null
