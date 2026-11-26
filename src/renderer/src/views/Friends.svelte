@@ -41,7 +41,7 @@
     <input class="grow" bind:value={name} maxlength="64" aria-label="Your name" />
     <button disabled={!name.trim() || name.trim() === ui.device.name} onclick={() => act(() => call('setDeviceName', name), 'Name saved')}>Save</button>
   </div>
-  <p class="faint small">What your friends see. They get a new name with your next save or invite code.</p>
+  <p class="faint small">Your friends see this name. If you change it, they’ll see the new one after you next play.</p>
 </section>
 
 <section class="two">
