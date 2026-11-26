@@ -111,11 +111,6 @@
   </ol>
 </div>
 
-<div class="legend small muted">
-  <span><i class="swatch main"></i>The shared game</span>
-  {#if graph.lanes > 1}<span><i class="swatch"></i>Played separately</span>{/if}
-  {#if hasRestore}<span><i class="swatch dashed"></i>Restored from here</span>{/if}
-</div>
 
 <style>
   .graph { display: flex; gap: 12px; }
@@ -134,9 +129,4 @@
   .tight-row { gap: 8px; }
   .faint-text { color: var(--muted); }
   .latest { font-size: 12px; font-weight: 600; color: #1b0f08; background: var(--ember); padding: 1px 8px; border-radius: 999px; }
-  .legend { display: flex; gap: 18px; flex-wrap: wrap; padding-top: 6px; }
-  .legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .swatch { display: inline-block; width: 18px; border-top: 2px solid var(--faint); }
-  .swatch.main { border-top-color: var(--ember); }
-  .swatch.dashed { border-top: 2px dashed var(--ok); }
 </style>
