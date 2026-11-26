@@ -1,4 +1,4 @@
-// Renders the app icon (a glowing ember on a dark rounded tile) to PNG without
+// Renders the app icon (the Relay Loop mark on a dark rounded tile) to PNG without
 // image dependencies. Outputs build/icon.png and resources/tray*.png.
 import { deflateSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
@@ -52,12 +52,31 @@ function png(size, pixel) {
 
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * Math.min(1, Math.max(0, t)))
 
-// Flame silhouette: a teardrop pointing up, with a hot core.
-function flame(u, v) {
-  const x = (u - 0.5) / 0.30
-  const y = (v - 0.60) / 0.30
-  const r = y < 0 ? Math.hypot(x / (1 + y * 0.9), y) : Math.hypot(x, y)
-  return r
+// Relay Loop: two arrows chasing each other round a circle, in a 100x100 box.
+// Each arc is drawn clockwise (screen angles, y down) and ends in an arrowhead.
+const ARCS = [
+  { from: 160, span: 140, color: [255, 122, 61], head: [[69.8, 33.7], [66.5, 21.4], [57.5, 37]] },
+  { from: 340, span: 140, color: [255, 179, 71], head: [[30.2, 66.3], [33.5, 78.6], [42.5, 63]] },
+]
+const R = 24, HALF = 4.5
+
+function inTriangle([px, py], [a, b, c]) {
+  const side = (p, q) => (q[0] - p[0]) * (py - p[1]) - (q[1] - p[1]) * (px - p[0])
+  const d1 = side(a, b), d2 = side(b, c), d3 = side(c, a)
+  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))
+}
+
+function onArc(x, y, { from, span }) {
+  const end = (a) => [50 + R * Math.cos((a * Math.PI) / 180), 50 + R * Math.sin((a * Math.PI) / 180)]
+  const rel = (((Math.atan2(y - 50, x - 50) * 180) / Math.PI - from) % 360 + 360) % 360
+  if (rel <= span && Math.abs(Math.hypot(x - 50, y - 50) - R) <= HALF) return true
+  return [end(from), end(from + span)].some(([ex, ey]) => Math.hypot(x - ex, y - ey) <= HALF)
+}
+
+// Colour of the mark at (x, y) in the 100x100 box, or null outside it.
+function mark(x, y) {
+  for (const arc of ARCS) if (onArc(x, y, arc) || inTriangle([x, y], arc.head)) return arc.color
+  return null
 }
 
 function appIcon(u, v) {
@@ -65,19 +84,13 @@ function appIcon(u, v) {
   const dx = Math.max(m + rad - u, 0, u - (1 - m - rad))
   const dy = Math.max(m + rad - v, 0, v - (1 - m - rad))
   if (Math.hypot(dx, dy) > rad) return [0, 0, 0, 0]
-  const bg = mix([38, 28, 34], [20, 16, 22], v)
-  const f = flame(u, v)
-  const glow = Math.max(0, 1 - f / 1.6) ** 2
-  let col = mix(bg, [255, 110, 40], glow * 0.55)
-  if (f < 1) col = mix([255, 92, 38], [255, 214, 120], (1 - f) * 1.4)
-  return [...col, 1]
+  return [...(mark(u * 100, v * 100) ?? mix([46, 37, 52], [36, 29, 41], v)), 1]
 }
 
+// The tray drops the tile and crops to the mark so it fills the 16px slot.
 function trayIcon(u, v) {
-  const f = flame(u, v + 0.04)
-  if (f > 1.15) return [0, 0, 0, 0]
-  const col = mix([255, 92, 38], [255, 214, 120], (1 - f) * 1.4)
-  return [...col, f < 1 ? 1 : (1.15 - f) / 0.15]
+  const col = mark(16 + u * 68, 16 + v * 68)
+  return col ? [...col, 1] : [0, 0, 0, 0]
 }
 
 const out = [
