@@ -99,6 +99,7 @@ export interface Discovered {
   name: string
   path: string
   added: boolean
+  lastPlayedAt: number
 }
 
 export interface WorldInput {

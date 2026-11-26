@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { call, type AppState } from './lib/api'
-  import StatusBadge from './lib/StatusBadge.svelte'
   import Overview from './views/Overview.svelte'
   import WorldDetail from './views/WorldDetail.svelte'
   import AddWorld from './views/AddWorld.svelte'
@@ -61,17 +60,10 @@
       </div>
 
       <nav>
-        <button class="nav" class:active={route.kind === 'overview'} onclick={() => go({ kind: 'overview' })}>
+        <button class="nav" class:active={['overview', 'world', 'add'].includes(route.kind)} onclick={() => go({ kind: 'overview' })}>
           Saves
           {#if ui.invitations.length}<span class="count">{ui.invitations.length}</span>{/if}
         </button>
-        {#each ui.worlds as w (w.id)}
-          <button class="nav sub" class:active={selectedWorldId === w.id} onclick={() => go({ kind: 'world', id: w.id })}>
-            <span class="ellipsis grow">{w.name}</span>
-            <StatusBadge status={w.status} />
-          </button>
-        {/each}
-        <button class="nav sub add" class:active={route.kind === 'add'} onclick={() => go({ kind: 'add' })}>+ Share a save</button>
         <button class="nav" class:active={route.kind === 'friends'} onclick={() => go({ kind: 'friends' })}>
           Friends
           {#if ui.pendingDevices.length}<span class="count">{ui.pendingDevices.length}</span>{/if}
@@ -103,7 +95,7 @@
       {/if}
 
       {#if route.kind === 'overview'}
-        <Overview {ui} {go} {attention} />
+        <Overview {ui} {act} {go} {attention} />
       {:else if route.kind === 'world'}
         {#if currentWorld}
           {#key currentWorld.id}
@@ -138,9 +130,6 @@
   .nav { display: flex; align-items: center; gap: 8px; text-align: left; background: transparent; border: none; padding: 9px 10px; border-radius: 8px; font-weight: 500; }
   .nav:hover:not(:disabled) { background: var(--panel); }
   .nav.active { background: var(--panel-2); }
-  .nav.sub { padding-left: 18px; font-weight: 400; color: var(--muted); font-size: 13px; }
-  .nav.sub.active { color: var(--text); }
-  .nav.add { color: var(--ember-2); }
   .count { margin-left: auto; background: var(--ember); color: #1b0f08; border-radius: 999px; font-size: 11px; padding: 0 7px; font-weight: 700; }
   .foot { display: flex; flex-direction: column; gap: 8px; padding: 0 8px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }

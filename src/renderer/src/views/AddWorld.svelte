@@ -4,7 +4,14 @@
 
   type Act = <T>(fn: () => Promise<T>, success?: string) => Promise<T | undefined>
   type Go = (r: { kind: 'world'; id: string } | { kind: 'overview' } | { kind: 'friends' }) => void
-  let { ui, act, go, folderId }: { ui: AppState; act: Act; go: Go; folderId?: string } = $props()
+  let {
+    ui,
+    act,
+    go,
+    folderId,
+    preset,
+    onclose,
+  }: { ui: AppState; act: Act; go: Go; folderId?: string; preset?: { path: string; discovered?: Discovered }; onclose?: () => void } = $props()
 
   const invitation = $derived(folderId ? ui.invitations.find((i) => i.folderId === folderId) : undefined)
   const joining = $derived(!!folderId)
@@ -26,6 +33,11 @@
   onMount(async () => {
     if (invitation) name = invitation.label
     sharedWith = ui.peers.map((p) => p.deviceId)
+    if (preset) {
+      scanning = false
+      await choose(preset.path, preset.discovered)
+      return
+    }
     discovered = (await act(() => call<Discovered[]>('discover'))) ?? []
     scanning = false
   })
@@ -150,7 +162,7 @@
 
     <div class="row">
       <button class="primary" disabled={!name.trim() || busy} onclick={submit}>{joining ? 'Join' : 'Share'}</button>
-      <button class="ghost" onclick={() => (path = '')}>Back</button>
+      <button class="ghost" onclick={() => (onclose ? onclose() : (path = ''))}>{onclose ? 'Cancel' : 'Back'}</button>
     </div>
   </section>
 {/if}

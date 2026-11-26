@@ -704,8 +704,8 @@ export class Engine extends EventEmitter {
     return { groups, decisions }
   }
 
-  async discover(): Promise<{ gameId: string; gameName: string; name: string; path: string; added: boolean }[]> {
-    const out: { gameId: string; gameName: string; name: string; path: string; added: boolean }[] = []
+  async discover(): Promise<{ gameId: string; gameName: string; name: string; path: string; added: boolean; lastPlayedAt: number }[]> {
+    const out: { gameId: string; gameName: string; name: string; path: string; added: boolean; lastPlayedAt: number }[] = []
     for (const game of GAMES) {
       const d = game.discovery
       if (!d || d.platform !== process.platform) continue
@@ -722,12 +722,21 @@ export class Engine extends EventEmitter {
       const want = globToRegExp(d.mustContain)
       for (const dir of level) {
         const files = await readdir(dir).catch(() => [] as string[])
-        if (!files.some((f) => want.test(f))) continue
+        const saves = files.filter((f) => want.test(f))
+        if (!saves.length) continue
+        const times = await Promise.all(saves.map((f) => stat(join(dir, f)).then((s) => s.mtimeMs, () => 0)))
         const added = this.cfg.worlds.some((w) => resolvePath(w.localPath).toLowerCase() === resolvePath(dir).toLowerCase())
-        out.push({ gameId: game.id, gameName: game.name, name: basename(dir).replace(/^MP-/, ''), path: dir, added })
+        out.push({
+          gameId: game.id,
+          gameName: game.name,
+          name: basename(dir).replace(/^MP-/, ''),
+          path: dir,
+          added,
+          lastPlayedAt: Math.max(...times),
+        })
       }
     }
-    return out
+    return out.sort((a, b) => b.lastPlayedAt - a.lastPlayedAt)
   }
 
   snapshot() {

@@ -62,6 +62,7 @@ input[type='text'], input:not([type]), textarea, select {
   font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
   border-radius: 8px; padding: 8px 10px; width: 100%;
 }
+button:focus:not(:focus-visible) { outline: none; }
 input:focus, textarea:focus, select:focus, button:focus-visible { outline: 2px solid color-mix(in srgb, var(--ember) 70%, transparent); outline-offset: 1px; }
 textarea { resize: vertical; min-height: 70px; }
 label.field { display: flex; flex-direction: column; gap: 6px; }
