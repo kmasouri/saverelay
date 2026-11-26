@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { call, when, type AppState, type Discovered, type World } from '../lib/api'
+  import { bytes, call, when, type AppState, type Discovered, type World } from '../lib/api'
   import StatusBadge from '../lib/StatusBadge.svelte'
   import AddWorld from './AddWorld.svelte'
 
@@ -109,7 +109,7 @@
             {@const w = r.world}
             <button class="open grow" title={w.localPath} onclick={() => go({ kind: 'world', id: w.id })}>
               <strong class="ellipsis">{r.name}</strong>
-              <span class="muted small">{w.detail || `Last played ${when(r.lastPlayedAt)} · with ${w.sharedWith.length} friend${w.sharedWith.length === 1 ? '' : 's'}`}</span>
+              <span class="muted small">{w.detail || `Last played ${when(r.lastPlayedAt)} · with ${w.sharedWith.length} friend${w.sharedWith.length === 1 ? '' : 's'}${w.storageBytes !== null ? ` · ${bytes(w.storageBytes)}` : ''}`}</span>
             </button>
             <StatusBadge status={w.status} />
           {:else}

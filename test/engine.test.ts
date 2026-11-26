@@ -1,7 +1,7 @@
 // Three simulated devices with an in-memory transport that copies staging stores
 // between peers who share a folder, standing in for Syncthing.
 
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -171,6 +171,32 @@ afterEach(async () => {
 })
 
 describe('three friends sharing one world', () => {
+  it('clears files of versions past the group limit, keeping the latest and recent ones', async () => {
+    await devices.a.engine.setKeepVersions(world(devices.a).id, 5)
+    for (let i = 1; i <= 8; i++) {
+      await writeSave(devices.a, 'world.a7s', `session-${i}`, 10_000 + i)
+      await rounds()
+    }
+    clock += 11 * 60_000
+    await rounds(2)
+    const { graph, groups } = await devices.a.engine.history(world(devices.a).id)
+    expect(graph.nodes.filter((n) => !n.cleared)).toHaveLength(5)
+    expect(graph.nodes.some((n) => n.cleared)).toBe(true)
+    for (const d of Object.values(devices)) {
+      for (const n of graph.nodes) {
+        const sha = groups.find((g) => g.contentId === n.contentId)!.files[0].sha256
+        const kept = await stat(join(d.dataDir, 'staging', world(d).id, 'objects', sha.slice(0, 2), sha)).then(
+          () => true,
+          () => false,
+        )
+        expect(kept, `${d.name} row ${n.row}`).toBe(!n.cleared)
+      }
+      expect(world(d).policy.keepVersions).toBe(5)
+      expect(world(d).storageBytes).toBeGreaterThan(0)
+    }
+    expect(await readSave(devices.c)).toBe('session-8')
+  })
+
   it('joining devices receive the shared world; their old local saves are backed up', async () => {
     expect(await readSave(devices.b)).toBe('v0')
     expect(await readSave(devices.c)).toBe('v0')

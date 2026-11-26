@@ -13,9 +13,14 @@ export interface Candidate {
   deviceNames: string[]
 }
 
+/** Versions whose files are kept when nobody has chosen otherwise. */
+export const DEFAULT_KEEP_VERSIONS = 20
+
 export interface PolicySetting {
   policy: Policy
   preferredDeviceId?: string
+  /** How many versions keep their files; 0 keeps all. */
+  keepVersions: number
   setBy?: string
   setAt?: number
 }
@@ -28,8 +33,14 @@ export type Resolution =
 
 export function currentPolicy(events: SyncEvent[]): PolicySetting {
   const latest = events.filter((e): e is PolicyEvent => e.kind === 'policy').sort(compareEvents).at(-1)
-  if (!latest) return { policy: 'ask' }
-  return { policy: latest.policy, preferredDeviceId: latest.preferredDeviceId, setBy: latest.deviceName, setAt: latest.at }
+  if (!latest) return { policy: 'ask', keepVersions: DEFAULT_KEEP_VERSIONS }
+  return {
+    policy: latest.policy,
+    preferredDeviceId: latest.preferredDeviceId,
+    keepVersions: latest.keepVersions ?? DEFAULT_KEEP_VERSIONS,
+    setBy: latest.deviceName,
+    setAt: latest.at,
+  }
 }
 
 /** Version ids rejected by earlier decisions. Earlier decisions win; a later one cannot revive a rejected id. */

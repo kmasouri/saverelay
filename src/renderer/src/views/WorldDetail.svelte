@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { call, exact, POLICY_LABEL, splitList, when, type AppState, type Graph, type GraphNode, type Policy, type World } from '../lib/api'
+  import { bytes, call, exact, POLICY_LABEL, splitList, when, type AppState, type Graph, type GraphNode, type Policy, type World } from '../lib/api'
   import HistoryGraph from '../lib/HistoryGraph.svelte'
   import StatusBadge from '../lib/StatusBadge.svelte'
 
@@ -21,6 +21,10 @@
       if (h) graph = h.graph
     })
   })
+
+  // Versions past the group's limit have no files left; the list stops there.
+  const shown = $derived(graph ? (graph.keepVersions ? Math.min(graph.keepVersions, graph.nodes.length) : graph.nodes.length) : 0)
+  const anyCleared = $derived(!!graph?.nodes.some((n) => n.cleared))
 
   const gameName = $derived(ui.games.find((g) => g.id === world.gameId)?.name ?? 'Other game')
   const online = (id: string): boolean => !!ui.peers.find((p) => p.deviceId === id)?.connected
@@ -96,16 +100,26 @@
 <section class="card stack">
   <div class="row spread">
     <h2>History</h2>
-    <span class="faint small">Newest at the top</span>
+    <label class="row small muted keep">
+      Keep the last
+      <select value={world.policy.keepVersions} onchange={(e) => act(() => call('setKeepVersions', world.id, Number(e.currentTarget.value)), 'History limit updated for everyone')}>
+        {#each [5, 10, 20, 50] as n}<option value={n}>{n}</option>{/each}
+        <option value={0}>all</option>
+      </select>
+      versions · applies to everyone
+    </label>
   </div>
   {#if !graph}
     <p class="muted small">Loading…</p>
   {:else if graph.nodes.length === 0}
     <p class="muted small">No versions yet. The first one appears after the game saves and closes.</p>
   {:else}
-    <HistoryGraph {graph} me={ui.device.deviceId} {online} limit={showAll ? graph.nodes.length : 10} onrestore={restore} />
-    {#if graph.nodes.length > 10}
-      <button class="ghost more" onclick={() => (showAll = !showAll)}>{showAll ? 'Show fewer' : `Show older (${graph.nodes.length - 10})`}</button>
+    <HistoryGraph {graph} me={ui.device.deviceId} {online} limit={showAll ? shown : Math.min(10, shown)} onrestore={restore} />
+    {#if shown > 10}
+      <button class="ghost more" onclick={() => (showAll = !showAll)}>{showAll ? 'Show fewer' : `Show older (${shown - 10})`}</button>
+    {/if}
+    {#if anyCleared && (showAll || shown <= 10)}
+      <p class="faint small">Older versions were cleared to save space.</p>
     {/if}
   {/if}
 </section>
@@ -146,6 +160,7 @@
     {#if !editing}<button class="ghost" onclick={startEdit}>Edit</button>{/if}
   </div>
   <span class="mono">{world.localPath}</span>
+  {#if world.storageBytes !== null}<div class="small muted">SaveRelay uses {bytes(world.storageBytes)} on this PC for this save’s history and backups</div>{/if}
   {#if editing}
     <label class="field"><span>Game process names</span><input bind:value={processes} /></label>
     <label class="field"><span>Include</span><input bind:value={include} /></label>
@@ -166,6 +181,8 @@
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .cands { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
   .more { align-self: flex-start; }
+  .keep { gap: 6px; }
+  .keep select { width: auto; padding: 4px 8px; }
   .presence { gap: 6px; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
   .dot.on { background: var(--ok); }

@@ -53,6 +53,7 @@ export function parseEvent(raw: unknown, worldId: string, authorDir: string): Si
     case 'policy':
       if (!POLICIES.includes(e.policy as Policy)) return null
       if (e.preferredDeviceId !== undefined && !isStr(e.preferredDeviceId)) return null
+      if (e.keepVersions !== undefined && !(Number.isInteger(e.keepVersions) && isNum(e.keepVersions) && (e.keepVersions as number) <= 10_000)) return null
       return e as unknown as SignedEvent
     default:
       return null

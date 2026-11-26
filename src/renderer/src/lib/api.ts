@@ -33,7 +33,9 @@ export interface World {
   detail: string
   warnings: string[]
   pendingUpdate: boolean
-  policy: { policy: Policy; preferredDeviceId?: string; setBy?: string; setAt?: number }
+  policy: { policy: Policy; preferredDeviceId?: string; keepVersions: number; setBy?: string; setAt?: number }
+  /** Space this save takes on this PC (history and backups); null until first counted. */
+  storageBytes: number | null
   conflict: Candidate[] | null
   autoNote: string | null
   acceptedContentId: string | null
@@ -117,11 +119,13 @@ export interface GraphNode {
   lane: number
   row: number
   here: string[]
+  cleared: boolean
 }
 
 export interface Graph {
   nodes: GraphNode[]
   lanes: number
+  keepVersions: number
   names: Record<string, string>
 }
 

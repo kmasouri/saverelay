@@ -4,7 +4,7 @@
 // every peer draws the same graph.
 
 import { snapshotModifiedAt } from './history'
-import { resolve } from './reconcile'
+import { currentPolicy, heads, resolve } from './reconcile'
 import { compareEvents, isVersion, type SyncEvent, type VersionEvent } from './types'
 
 export interface GraphNode {
@@ -28,11 +28,15 @@ export interface GraphNode {
   row: number
   /** Devices whose save folder held this version when they last reported. */
   here: string[]
+  /** Past the group's "keep the last N versions" limit: its files are deleted to save space. */
+  cleared: boolean
 }
 
 export interface Graph {
   nodes: GraphNode[]
   lanes: number
+  /** The group's limit; 0 keeps every version. */
+  keepVersions: number
   /** Most recently reported name for each device. */
   names: Record<string, string>
 }
@@ -45,7 +49,8 @@ export function buildGraph(events: SyncEvent[]): Graph {
     names[e.deviceId] = e.deviceName
     if (isVersion(e)) versions.set(e.id, e)
   }
-  if (!versions.size) return { nodes: [], lanes: 1, names }
+  const keep = currentPolicy(events).keepVersions
+  if (!versions.size) return { nodes: [], lanes: 1, keepVersions: keep, names }
 
   const ancestorsOf = (ids: string[]): Set<string> => {
     const seen = new Set<string>()
@@ -139,6 +144,11 @@ export function buildGraph(events: SyncEvent[]): Graph {
   const here = new Map<string, string[]>()
   for (const [device, id] of position) here.set(id, [...(here.get(id) ?? []), device])
 
+  // The newest `keep` rows keep their files, and so do the latest save and any
+  // version still competing in an unresolved fork, however old.
+  const protectedIds = new Set([...acceptedIds, ...heads(events).map((h) => h.id)])
+  const cleared = (v: VersionEvent): boolean => keep > 0 && row.get(v.id)! >= keep && !protectedIds.has(v.id)
+
   const nodes: GraphNode[] = order.map((v, i) => ({
     id: v.id,
     contentId: v.contentId,
@@ -154,6 +164,24 @@ export function buildGraph(events: SyncEvent[]): Graph {
     lane: main.has(v.id) ? 0 : chainOf.get(v.id)!.lane,
     row: i,
     here: here.get(v.id) ?? [],
+    cleared: cleared(v),
   }))
-  return { nodes, lanes: Math.max(1, ...nodes.map((n) => n.lane + 1)), names }
+  return { nodes, lanes: Math.max(1, ...nodes.map((n) => n.lane + 1)), keepVersions: keep, names }
+}
+
+/**
+ * File hashes that only cleared versions use, so they can be deleted. Files no
+ * known version mentions are never listed: they may belong to a friend's new
+ * version whose record hasn't arrived yet.
+ */
+export function filesToClear(events: SyncEvent[]): Set<string> {
+  const cleared = new Set(buildGraph(events).nodes.filter((n) => n.cleared).map((n) => n.id))
+  const keep = new Set<string>()
+  const drop = new Set<string>()
+  for (const e of events) {
+    if (!isVersion(e)) continue
+    for (const f of e.files) (cleared.has(e.id) ? drop : keep).add(f.sha256)
+  }
+  for (const sha of keep) drop.delete(sha)
+  return drop
 }

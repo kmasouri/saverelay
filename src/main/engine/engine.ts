@@ -8,15 +8,15 @@
 
 import { randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { lstat, readFile, readdir, realpath, stat } from 'node:fs/promises'
+import { lstat, readFile, readdir, realpath, rm, stat } from 'node:fs/promises'
 import { basename, join, resolve as resolvePath } from 'node:path'
 import { GAMES, gameById } from '../../core/games'
-import { buildGraph, type Graph } from '../../core/graph'
+import { buildGraph, filesToClear, type Graph } from '../../core/graph'
 import { buildHistory, type ContentGroup } from '../../core/history'
 import { decodeInvite, encodeInvite, signEvent } from '../../core/identity'
 import { contentIdOf } from '../../core/manifest'
 import { globToRegExp } from '../../core/paths'
-import { resolve, type Candidate, type Resolution } from '../../core/reconcile'
+import { DEFAULT_KEEP_VERSIONS, currentPolicy, resolve, type Candidate, type Resolution } from '../../core/reconcile'
 import { SCHEMA, compareEvents, isVersion, type FileEntry, type Policy, type SyncEvent } from '../../core/types'
 import { applySnapshot, recoverJournal } from './applier'
 import { loadConfig, saveConfig, type AppConfig, type WorldConfig } from './config'
@@ -42,6 +42,21 @@ interface WorldState {
   decided: string[]
   lastAppliedAt: number
   lastCaptureAt: number
+}
+
+/** How often each save's old versions and backups are cleared and its size recounted. */
+const HOUSEKEEPING_MS = 10 * 60_000
+/** Backups taken before a friend's save replaces yours, kept per save on this PC. */
+const BACKUPS_KEPT = 3
+export const KEEP_VERSION_CHOICES = [5, 10, 20, 50, 0]
+
+async function dirSize(dir: string): Promise<number> {
+  let total = 0
+  for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+    const p = join(dir, e.name)
+    total += e.isDirectory() ? await dirSize(p) : ((await stat(p).catch(() => null))?.size ?? 0)
+  }
+  return total
 }
 
 interface Runtime {
@@ -87,6 +102,8 @@ export class Engine extends EventEmitter {
   private pendingFolders: { folderId: string; label: string; offeredBy: string[] }[] = []
   private connections: Record<string, boolean> = {}
   private lastSeen: Record<string, number> = {}
+  private housekeptAt = new Map<string, number>()
+  private storage = new Map<string, number>()
   /** Worlds whose staging store changed locally since the transport last scanned it. */
   private dirty = new Set<string>()
   private readonly now: () => number
@@ -227,7 +244,59 @@ export class Engine extends EventEmitter {
       if (JSON.stringify(this.states.get(w.id)) !== before) await this.persistState(w.id)
     }
     await this.flushToTransport()
+    await this.housekeeping()
     this.emit('change')
+  }
+
+  // ---- housekeeping --------------------------------------------------------
+
+  private async housekeeping(): Promise<void> {
+    for (const w of this.cfg.worlds) {
+      const now = this.now()
+      if (now - (this.housekeptAt.get(w.id) ?? 0) < HOUSEKEEPING_MS) continue
+      // Never while the game might be writing, or while a save is being applied.
+      if (this.states.get(w.id)?.playing || this.runtimes.get(w.id)?.status === 'pending-update') continue
+      this.housekeptAt.set(w.id, now)
+      try {
+        const freed = (await this.clearOldVersions(w)) + (await this.trimBackups(w))
+        if (freed) this.deps.log(`world ${w.name}: cleared ${(freed / 1024 ** 2).toFixed(1)} MB of old versions and backups`)
+        this.storage.set(w.id, (await dirSize(this.stagingDir(w.id))) + (await dirSize(join(this.deps.dataDir, 'backups', w.id))))
+      } catch (err) {
+        this.deps.log(`world ${w.name}: clean-up failed: ${String(err)}`)
+      }
+    }
+  }
+
+  /**
+   * Deletes the files only versions past the group's limit use. The store is
+   * shared, so the deletions reach every friend; every PC computes the same set.
+   */
+  private async clearOldVersions(w: WorldConfig): Promise<number> {
+    const store = this.stores.get(w.id)!
+    const { events, rejected } = await store.loadEvents(this.keyMap())
+    // A record we can't verify might name files we'd otherwise think unused.
+    if (rejected.length) return 0
+    let freed = 0
+    for (const sha of filesToClear(events)) {
+      const path = store.objectPath(sha)
+      const size = (await stat(path).catch(() => null))?.size
+      if (size === undefined) continue
+      await rm(path, { force: true })
+      freed += size
+    }
+    if (freed) this.dirty.add(w.id)
+    return freed
+  }
+
+  private async trimBackups(w: WorldConfig): Promise<number> {
+    const dir = join(this.deps.dataDir, 'backups', w.id)
+    const old = (await readdir(dir).catch(() => [] as string[])).sort().slice(0, -BACKUPS_KEPT)
+    let freed = 0
+    for (const name of old) {
+      freed += await dirSize(join(dir, name))
+      await rm(join(dir, name), { recursive: true, force: true })
+    }
+    return freed
   }
 
   // ---- transport -----------------------------------------------------------
@@ -681,8 +750,24 @@ export class Engine extends EventEmitter {
     if (!['ask', 'latest-modified', 'preferred-device'].includes(policy)) throw new Error('Unknown policy')
     if (policy === 'preferred-device' && !preferredDeviceId) throw new Error('Pick the preferred device.')
     this.world(worldId)
-    await this.emitEvent(this.stores.get(worldId)!, { kind: 'policy', policy, preferredDeviceId: policy === 'preferred-device' ? preferredDeviceId : undefined })
+    const keepVersions = await this.currentKeep(worldId)
+    await this.emitEvent(this.stores.get(worldId)!, { kind: 'policy', policy, preferredDeviceId: policy === 'preferred-device' ? preferredDeviceId : undefined, keepVersions })
     void this.tick()
+  }
+
+  /** Sets how many versions keep their files, for everyone sharing this save. 0 keeps all. */
+  async setKeepVersions(worldId: string, keepVersions: number): Promise<void> {
+    if (!KEEP_VERSION_CHOICES.includes(keepVersions)) throw new Error('Unknown history limit')
+    this.world(worldId)
+    const store = this.stores.get(worldId)!
+    const current = currentPolicy((await store.loadEvents(this.keyMap())).events)
+    await this.emitEvent(store, { kind: 'policy', policy: current.policy, preferredDeviceId: current.preferredDeviceId, keepVersions })
+    this.housekeptAt.delete(worldId)
+    void this.tick()
+  }
+
+  private async currentKeep(worldId: string): Promise<number> {
+    return currentPolicy((await this.stores.get(worldId)!.loadEvents(this.keyMap())).events).keepVersions
   }
 
   /** Resolves a conflict by recording which candidate becomes the shared continuation. */
@@ -796,7 +881,8 @@ export class Engine extends EventEmitter {
           detail: rt?.detail ?? '',
           warnings: rt?.warnings ?? [],
           pendingUpdate: rt?.pendingUpdate ?? false,
-          policy: res?.policy ?? { policy: 'ask' as Policy },
+          policy: res?.policy ?? { policy: 'ask' as Policy, keepVersions: DEFAULT_KEEP_VERSIONS },
+          storageBytes: this.storage.get(w.id) ?? null,
           conflict: res?.state === 'conflict' ? candidates : null,
           autoNote: res?.state === 'auto-resolved' ? res.note : null,
           acceptedContentId: res && 'accepted' in res ? res.accepted.contentId : null,

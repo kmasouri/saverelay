@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraph } from '../src/core/graph'
+import { buildGraph, filesToClear } from '../src/core/graph'
 import { contentIdOf } from '../src/core/manifest'
 import type { CaptureEvent, SyncEvent } from '../src/core/types'
 
@@ -96,5 +96,36 @@ describe('history graph', () => {
     const n = byId(buildGraph([a, s1, b, pick1, c, s2, d, pick2]))
     expect(n[s1.id].lane).toBe(1)
     expect(n[s2.id].lane).toBe(1)
+  })
+
+  it('clears versions past the group limit, but never the latest or an open fork', () => {
+    const keep: SyncEvent = { schema: 1, id: `p${++seq}`, worldId: W, deviceId: 'a', deviceName: 'Friend A', at: ++seq, kind: 'policy', policy: 'ask', keepVersions: 2 }
+    const a = v('a')
+    const b = v('b', [a.id])
+    const c = v('c', [b.id])
+    const d = v('d', [c.id])
+    const e = v('e', [c.id]) // d and e compete: an unresolved fork
+    const g = buildGraph([keep, a, b, c, d, e])
+    const n = byId(g)
+    expect(g.keepVersions).toBe(2)
+    expect([n[d.id].cleared, n[e.id].cleared]).toEqual([false, false])
+    expect([n[c.id].cleared, n[b.id].cleared, n[a.id].cleared]).toEqual([true, true, true])
+    const drop = filesToClear([keep, a, b, c, d, e])
+    expect([...drop].sort()).toEqual([a, b, c].map((x) => x.files[0].sha256).sort())
+  })
+
+  it('keeps a file that an old version shares with a kept one', () => {
+    const keep: SyncEvent = { schema: 1, id: `p${++seq}`, worldId: W, deviceId: 'a', deviceName: 'Friend A', at: ++seq, kind: 'policy', policy: 'ask', keepVersions: 1 }
+    const a = v('a')
+    const b: CaptureEvent = { ...v('b', [a.id]), files: [...a.files] }
+    expect(filesToClear([keep, a, b]).has(a.files[0].sha256)).toBe(false)
+  })
+
+  it('keeps everything when the limit is off or was never set', () => {
+    const a = v('a')
+    const b = v('b', [a.id])
+    expect(buildGraph([a, b]).nodes.some((x) => x.cleared)).toBe(false)
+    const all: SyncEvent = { schema: 1, id: `p${++seq}`, worldId: W, deviceId: 'a', deviceName: 'Friend A', at: ++seq, kind: 'policy', policy: 'ask', keepVersions: 0 }
+    expect(buildGraph([all, a, b]).nodes.some((x) => x.cleared)).toBe(false)
   })
 })

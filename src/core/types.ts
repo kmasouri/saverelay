@@ -62,6 +62,8 @@ export interface PolicyEvent extends EventBase {
   kind: 'policy'
   policy: Policy
   preferredDeviceId?: string
+  /** How many versions keep their files (0 = all). Absent in events from older versions. */
+  keepVersions?: number
 }
 
 export type SyncEvent = CaptureEvent | RestoreEvent | AppliedEvent | DecisionEvent | PolicyEvent
