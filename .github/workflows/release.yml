@@ -40,18 +40,47 @@ jobs:
       - name: Smoke test the packaged app
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "dist/win-unpacked/SaveRelay.exe" -ArgumentList "--hidden" -PassThru
+          $exe = "dist/win-unpacked/SaveRelay.exe"
           $log = Join-Path $env:APPDATA "SaveRelay/logs/main.log"
-          $ok = $false
-          for ($i = 0; $i -lt 60; $i++) {
-            Start-Sleep -Seconds 2
-            if ((Test-Path $log) -and (Select-String -Path $log -Pattern "Syncthing started as" -Quiet)) { $ok = $true; break }
+          function Wait-Log($pattern) {
+            for ($i = 0; $i -lt 60; $i++) {
+              if ((Test-Path $log) -and (Select-String -Path $log -Pattern $pattern -Quiet)) { return $true }
+              Start-Sleep -Seconds 2
+            }
+            return $false
           }
+          function Wait-AllStopped {
+            for ($i = 0; $i -lt 30; $i++) {
+              if (-not (Get-Process -Name "SaveRelay","syncthing" -ErrorAction SilentlyContinue)) { return $true }
+              Start-Sleep -Seconds 1
+            }
+            return $false
+          }
+          function Show-Log { if (Test-Path $log) { Get-Content $log | Select-Object -Last 40 } }
+          function Fail($msg) { Show-Log; Get-Process -Name "SaveRelay","syncthing" -ErrorAction SilentlyContinue | Stop-Process -Force; throw $msg }
+
+          # 1. Starts cleanly and quits leaving nothing running.
+          Start-Process -FilePath $exe -ArgumentList "--hidden"
+          if (-not (Wait-Log "Syncthing started as")) { Fail "App did not start Syncthing" }
           Start-Sleep -Seconds 5
-          if (Test-Path $log) { Get-Content $log | Select-Object -Last 40 }
-          Get-Process -Name "SaveRelay","syncthing" -ErrorAction SilentlyContinue | Stop-Process -Force
-          if (-not $ok) { throw "App did not start Syncthing" }
-          if (Select-String -Path $log -Pattern "failed|exited unexpectedly" -Quiet) { throw "Errors in startup log" }
+          if (Select-String -Path $log -Pattern "failed|exited unexpectedly" -Quiet) { Fail "Errors in startup log" }
+          Start-Process -FilePath $exe -ArgumentList "--quit"
+          if (-not (Wait-AllStopped)) { Fail "Quitting left SaveRelay or Syncthing running" }
+
+          # 2. After a hard kill leaves Syncthing behind, the next start takes over and quits cleanly.
+          Remove-Item $log
+          Start-Process -FilePath $exe -ArgumentList "--hidden"
+          if (-not (Wait-Log "Syncthing started as")) { Fail "App did not start Syncthing the second time" }
+          Get-Process -Name "SaveRelay" | Stop-Process -Force
+          Start-Sleep -Seconds 3
+          if (-not (Get-Process -Name "syncthing" -ErrorAction SilentlyContinue)) { Fail "Expected Syncthing to outlive the killed app" }
+          Start-Process -FilePath $exe -ArgumentList "--hidden"
+          if (-not (Wait-Log "stopped a copy left running")) { Fail "App did not take over from the leftover Syncthing" }
+          for ($i = 0; $i -lt 30 -and @(Select-String -Path $log -Pattern "Syncthing started as").Count -lt 2; $i++) { Start-Sleep -Seconds 2 }
+          if (@(Select-String -Path $log -Pattern "Syncthing started as").Count -lt 2) { Fail "App did not start Syncthing after taking over" }
+          Start-Process -FilePath $exe -ArgumentList "--quit"
+          if (-not (Wait-AllStopped)) { Fail "Quitting after a takeover left something running" }
+          Show-Log
 
       - uses: actions/upload-artifact@v4
         with:

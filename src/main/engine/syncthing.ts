@@ -14,6 +14,8 @@ export interface SyncthingOptions {
   /** Extra settings applied on start; tests use these to stay on localhost. */
   options?: Record<string, unknown>
   log: (msg: string) => void
+  /** Called when a running instance stops without being asked to. */
+  onUnexpectedExit?: () => void
 }
 
 export interface PendingFolder {
@@ -56,6 +58,7 @@ export class Syncthing {
   }
 
   private lockedOut = false
+  private up = false
   private get portFile(): string {
     return join(this.opts.home, 'saverelay-gui-port')
   }
@@ -96,7 +99,12 @@ export class Syncthing {
     child.stderr?.on('data', forward)
     child.on('exit', (code) => {
       this.child = null
-      if (!this.stopping) this.opts.log(`[syncthing] exited unexpectedly with code ${code}`)
+      const wasUp = this.up
+      this.up = false
+      if (this.stopping) return
+      this.opts.log(`[syncthing] exited unexpectedly with code ${code}`)
+      // Only after a successful start: a failed start is reported by start() itself.
+      if (wasUp) this.opts.onUnexpectedExit?.()
     })
 
     const deadline = Date.now() + 60_000
@@ -106,6 +114,7 @@ export class Syncthing {
         const status = await this.get<{ myID: string }>('/rest/system/status')
         this.myId = status.myID
         await writeFile(this.portFile, String(port)).catch(() => undefined)
+        this.up = true
         break
       } catch {
         if (Date.now() > deadline) throw new Error('Syncthing did not start within 60s')

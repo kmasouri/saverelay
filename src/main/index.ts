@@ -8,6 +8,7 @@ import { loadConfig } from './engine/config'
 import { Engine, type NewWorldInput } from './engine/engine'
 import { systemProcessDetector } from './engine/process'
 import { Syncthing } from './engine/syncthing'
+import { createShutdown } from './lifecycle'
 import { createLogger } from './logger'
 import { Updater } from './updater'
 import type { Policy } from '../core/types'
@@ -15,26 +16,40 @@ import type { Policy } from '../core/types'
 const APP_ID = 'com.kmasouri.saverelay'
 const here = dirname(fileURLToPath(import.meta.url))
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit()
-} else {
-  main().catch((err) => {
-    // Never linger invisibly: a hidden copy holds the single-instance lock and blocks every relaunch.
-    const logFile = join(app.getPath('userData'), 'logs', 'main.log')
-    const detail = err instanceof Error ? (err.stack ?? err.message) : String(err)
-    createLogger(dirname(logFile)).log(`Startup failed: ${detail}`)
+const logger = createLogger(join(app.getPath('userData'), 'logs'))
+// Every exit goes through here; startup registers what to stop as it starts it.
+// A clean quit ends with app.quit() so the updater still installs a downloaded update on the way out.
+const shutdown = createShutdown((code) => (code ? app.exit(code) : app.quit()), logger.log)
+
+/**
+ * A hard failure: stop everything cleanly, say why, and exit. Never linger
+ * invisibly, since a hidden copy holds the single-instance lock and blocks
+ * every relaunch.
+ */
+function fatal(message: string, err: unknown): void {
+  if (shutdown.started) return
+  logger.log(`${message}: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`)
+  void shutdown.run(1, () => {
     const choice = dialog.showMessageBoxSync({
       type: 'error',
       title: 'SaveRelay',
-      message: 'SaveRelay could not start',
+      message,
       detail: `${err instanceof Error ? err.message : String(err)}\n\nThe crash log has the details.`,
       buttons: ['Show crash log', 'Quit'],
       defaultId: 0,
       cancelId: 1,
     })
-    if (choice === 0) shell.showItemInFolder(logFile)
-    app.exit(1)
+    if (choice === 0) shell.showItemInFolder(logger.file)
   })
+}
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  process.on('uncaughtException', (err) => fatal('SaveRelay hit an error and has to close', err))
+  // Rejections are logged, not fatal: background work already reports its own failures in the UI.
+  process.on('unhandledRejection', (err) => logger.log(`Unhandled rejection: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`))
+  main().catch((err) => fatal('SaveRelay could not start', err))
 }
 
 async function main(): Promise<void> {
@@ -42,7 +57,6 @@ async function main(): Promise<void> {
   await app.whenReady()
 
   const dataDir = app.getPath('userData')
-  const logger = createLogger(join(dataDir, 'logs'))
   const log = logger.log
   log(`SaveRelay ${app.getVersion()} starting on ${process.platform}-${process.arch}`)
   // A marker that only a clean exit removes. Still there from before the PC last
@@ -52,16 +66,13 @@ async function main(): Promise<void> {
   const crashedLastTime = (statSync(runningMarker, { throwIfNoEntry: false })?.mtimeMs ?? 0) > bootedAt
   if (crashedLastTime) log('The previous run did not exit cleanly')
   writeFileSync(runningMarker, String(process.pid))
-  const cleanExit = (): void => rmSync(runningMarker, { force: true })
-  process.on('uncaughtException', (err) => log(`Uncaught error: ${err.stack ?? err.message}`))
-  process.on('unhandledRejection', (err) => log(`Unhandled rejection: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`))
+  shutdown.add({ name: 'crash marker', run: () => rmSync(runningMarker, { force: true }), timeoutMs: 1_000 })
 
   const resources = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
   const exe = process.platform === 'win32' ? 'syncthing.exe' : 'syncthing'
   const syncthingBin = app.isPackaged ? join(resources, 'syncthing', exe) : join(resources, 'syncthing', `${process.platform}-${process.arch}`, exe)
 
   let syncthing: Syncthing | null = null
-  const engineRef: { current: Engine | null } = { current: null }
 
   const notify = (title: string, body: string): void => {
     if (Notification.isSupported()) {
@@ -74,7 +85,24 @@ async function main(): Promise<void> {
   // The transport's API key is per-install, persisted in our config, and only used on 127.0.0.1.
   const { syncthingApiKey } = await loadConfig(join(dataDir, 'config.json'))
   if (existsSync(syncthingBin)) {
-    syncthing = new Syncthing({ binary: syncthingBin, home: join(dataDir, 'syncthing'), apiKey: syncthingApiKey, log })
+    // If the sync program dies on its own, bring it back, but not in a loop.
+    const restarts: number[] = []
+    const restart = (): void => {
+      if (shutdown.started) return
+      const now = Date.now()
+      restarts.splice(0, restarts.length, ...restarts.filter((t) => now - t < 10 * 60_000), now)
+      if (restarts.length > 3) return log('Sync program keeps stopping; not restarting it again')
+      setTimeout(() => {
+        if (shutdown.started || syncthing?.running) return
+        syncthing?.start().then(
+          () => log('Sync program restarted'),
+          (err) => log(`Sync program restart failed: ${String(err)}`),
+        )
+      }, 5_000)
+    }
+    syncthing = new Syncthing({ binary: syncthingBin, home: join(dataDir, 'syncthing'), apiKey: syncthingApiKey, log, onUnexpectedExit: restart })
+    const transport = syncthing
+    shutdown.add({ name: 'sync program', run: () => transport.stop(), timeoutMs: 15_000 })
     try {
       await syncthing.start()
       log(`Syncthing started as ${syncthing.myId}`)
@@ -85,7 +113,7 @@ async function main(): Promise<void> {
     log(`Syncthing binary missing at ${syncthingBin}`)
   }
   const engine = await Engine.create({ dataDir, documentsDir: app.getPath('documents'), syncthing, detector: systemProcessDetector, notify, log })
-  engineRef.current = engine
+  shutdown.add({ name: 'engine', run: () => engine.stop(), timeoutMs: 10_000 })
 
   const updater = new Updater(log)
   const startHidden = process.argv.includes('--hidden')
@@ -127,6 +155,10 @@ async function main(): Promise<void> {
       return { action: 'deny' }
     })
     w.webContents.on('will-navigate', (e) => e.preventDefault())
+    w.webContents.on('render-process-gone', (_e, details) => {
+      log(`Window stopped (${details.reason})`)
+      if (details.reason !== 'clean-exit' && !w.isDestroyed()) w.reload()
+    })
     if (process.env.ELECTRON_RENDERER_URL) void w.loadURL(process.env.ELECTRON_RENDERER_URL)
     else void w.loadFile(join(here, '../renderer/index.html'))
     return w
@@ -138,7 +170,8 @@ async function main(): Promise<void> {
     win.focus()
   }
 
-  app.on('second-instance', () => showWindow())
+  // `SaveRelay.exe --quit` asks the running copy to shut down cleanly.
+  app.on('second-instance', (_e, argv) => (argv.includes('--quit') ? app.quit() : showWindow()))
 
   const trayImage = nativeImage.createFromPath(join(resources, 'tray.png'))
   const tray = new Tray(trayImage)
@@ -245,17 +278,9 @@ async function main(): Promise<void> {
     quitting = true
   })
   app.on('will-quit', (e) => {
-    if (!syncthing?.running && !engineRef.current) return
+    if (shutdown.finished) return
     e.preventDefault()
-    const shutdown = async (): Promise<void> => {
-      await engineRef.current?.stop()
-      engineRef.current = null
-      await syncthing?.stop()
-      syncthing = null
-      cleanExit()
-      app.quit()
-    }
-    void shutdown()
+    void shutdown.run(0)
   })
   app.on('window-all-closed', () => {
     /* keep running in the tray */
