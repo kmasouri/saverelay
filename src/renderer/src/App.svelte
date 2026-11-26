@@ -49,103 +49,107 @@
   const attention = $derived(ui ? ui.invitations.length + ui.pendingDevices.length : 0)
 </script>
 
-{#if !ui}
-  <div class="loading"><Logo size={42} spin /></div>
-{:else if !ui.device.nameChosen}
-  <form class="welcome card stack" onsubmit={(e) => { e.preventDefault(); void act(() => call('setDeviceName', screenName)) }}>
-    <Logo size={42} />
-    <h1>What should your friends call you?</h1>
-    <p class="muted">They see this name next to your saves. You can change it later on the Friends page.</p>
-    <input bind:value={screenName} maxlength="64" placeholder="Your name" aria-label="Your name" />
-    <button class="primary" type="submit" disabled={!screenName.trim()}>Continue</button>
-  </form>
-{:else}
-  <div class="shell">
-    <aside>
-      <div class="brand">
-        <Logo />
-        <div>
-          <div class="name">SaveRelay</div>
-          <div class="faint small ellipsis">{ui.device.name}</div>
-        </div>
-      </div>
+<div class="frame">
+  <!-- Our own title bar: draggable, with Windows drawing the window buttons over its right end. -->
+  <header class="titlebar">
+    <Logo size={18} />
+    <span class="title">SaveRelay</span>
+    {#if ui?.device.nameChosen}<span class="faint small ellipsis">{ui.device.name}</span>{/if}
+  </header>
+  <div class="body">
+    {#if !ui}
+      <div class="loading"><Logo size={42} spin /></div>
+    {:else if !ui.device.nameChosen}
+      <form class="welcome card stack" onsubmit={(e) => { e.preventDefault(); void act(() => call('setDeviceName', screenName)) }}>
+        <Logo size={42} />
+        <h1>What should your friends call you?</h1>
+        <p class="muted">They see this name next to your saves. You can change it later on the Friends page.</p>
+        <input bind:value={screenName} maxlength="64" placeholder="Your name" aria-label="Your name" />
+        <button class="primary" type="submit" disabled={!screenName.trim()}>Continue</button>
+      </form>
+    {:else}
+      <div class="shell">
+        <aside>
+          <nav>
+            <button class="nav" class:active={['overview', 'world', 'add'].includes(route.kind)} onclick={() => go({ kind: 'overview' })}>
+              Saves
+              {#if ui.invitations.length}<span class="count">{ui.invitations.length}</span>{/if}
+            </button>
+            <button class="nav" class:active={route.kind === 'friends'} onclick={() => go({ kind: 'friends' })}>
+              Friends
+              {#if ui.pendingDevices.length}<span class="count">{ui.pendingDevices.length}</span>{/if}
+            </button>
+            <button class="nav" class:active={route.kind === 'settings'} onclick={() => go({ kind: 'settings' })}>
+              Settings
+              {#if ui.update.status === 'ready'}<span class="count">1</span>{/if}
+            </button>
+          </nav>
 
-      <nav>
-        <button class="nav" class:active={['overview', 'world', 'add'].includes(route.kind)} onclick={() => go({ kind: 'overview' })}>
-          Saves
-          {#if ui.invitations.length}<span class="count">{ui.invitations.length}</span>{/if}
-        </button>
-        <button class="nav" class:active={route.kind === 'friends'} onclick={() => go({ kind: 'friends' })}>
-          Friends
-          {#if ui.pendingDevices.length}<span class="count">{ui.pendingDevices.length}</span>{/if}
-        </button>
-        <button class="nav" class:active={route.kind === 'settings'} onclick={() => go({ kind: 'settings' })}>
-          Settings
-          {#if ui.update.status === 'ready'}<span class="count">1</span>{/if}
-        </button>
-      </nav>
-
-      <div class="foot">
-        {#if ui.update.status === 'ready'}
-          <button class="primary" onclick={() => act(() => call('installUpdate'))}>Restart to update</button>
-        {/if}
-        <div class="row small">
-          <span class="dot" class:on={ui.transport.ok}></span>
-          <span class="muted">{ui.transport.ok ? `${ui.peers.filter((p) => p.connected).length}/${ui.peers.length} friends online` : 'Sync offline'}</span>
-        </div>
-        <div class="faint small">v{ui.app.version}</div>
-      </div>
-    </aside>
-
-    <main>
-      {#if ui.app.crashedLastTime && !crashSeen}
-        <div class="card alert banner row spread">
-          <span>SaveRelay closed unexpectedly last time.</span>
-          <div class="row">
-            <button onclick={() => act(() => call('showLog'))}>Show crash log</button>
-            <button class="ghost" onclick={() => (crashSeen = true)}>Dismiss</button>
+          <div class="foot">
+            {#if ui.update.status === 'ready'}
+              <button class="primary" onclick={() => act(() => call('installUpdate'))}>Restart to update</button>
+            {/if}
+            <div class="row small">
+              <span class="dot" class:on={ui.transport.ok}></span>
+              <span class="muted">{ui.transport.ok ? `${ui.peers.filter((p) => p.connected).length}/${ui.peers.length} friends online` : 'Sync offline'}</span>
+            </div>
+            <div class="faint small">v{ui.app.version}</div>
           </div>
-        </div>
-      {/if}
-      {#if !ui.transport.ok}
-        <div class="card danger banner">
-          <strong>Sync transport problem.</strong>
-          <span class="muted">{ui.transport.error}</span>
-        </div>
-      {/if}
+        </aside>
 
-      {#if route.kind === 'overview'}
-        <Overview {ui} {act} {go} {attention} />
-      {:else if route.kind === 'world'}
-        {#if currentWorld}
-          {#key currentWorld.id}
-            <WorldDetail world={currentWorld} {ui} {act} {go} />
-          {/key}
-        {:else}
-          <p class="muted">This save is no longer shared.</p>
-        {/if}
-      {:else if route.kind === 'add'}
-        {#key route.folderId}
-          <AddWorld {ui} {act} {go} folderId={route.folderId} />
-        {/key}
-      {:else if route.kind === 'friends'}
-        <Friends {ui} {act} />
-      {:else if route.kind === 'settings'}
-        <Settings {ui} {act} />
-      {/if}
-    </main>
+        <main>
+          {#if ui.app.crashedLastTime && !crashSeen}
+            <div class="card alert banner row spread">
+              <span>SaveRelay closed unexpectedly last time.</span>
+              <div class="row">
+                <button onclick={() => act(() => call('showLog'))}>Show crash log</button>
+                <button class="ghost" onclick={() => (crashSeen = true)}>Dismiss</button>
+              </div>
+            </div>
+          {/if}
+          {#if !ui.transport.ok}
+            <div class="card danger banner">
+              <strong>Sync transport problem.</strong>
+              <span class="muted">{ui.transport.error}</span>
+            </div>
+          {/if}
+
+          {#if route.kind === 'overview'}
+            <Overview {ui} {act} {go} {attention} />
+          {:else if route.kind === 'world'}
+            {#if currentWorld}
+              {#key currentWorld.id}
+                <WorldDetail world={currentWorld} {ui} {act} {go} />
+              {/key}
+            {:else}
+              <p class="muted">This save is no longer shared.</p>
+            {/if}
+          {:else if route.kind === 'add'}
+            {#key route.folderId}
+              <AddWorld {ui} {act} {go} folderId={route.folderId} />
+            {/key}
+          {:else if route.kind === 'friends'}
+            <Friends {ui} {act} />
+          {:else if route.kind === 'settings'}
+            <Settings {ui} {act} />
+          {/if}
+        </main>
+      </div>
+    {/if}
   </div>
-{/if}
+</div>
 
 {#if toast}
   <div class="toast {toast.tone}" role="status">{toast.text}</div>
 {/if}
 
 <style>
+  .frame { display: flex; flex-direction: column; height: 100%; }
+  .titlebar { height: 37px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 0 150px 0 14px; background: #130f15; border-bottom: 1px solid var(--line); -webkit-app-region: drag; user-select: none; }
+  .title { font-weight: 600; font-size: 13px; }
+  .body { flex: 1; min-height: 0; }
   .shell { display: grid; grid-template-columns: 260px 1fr; height: 100%; }
   aside { background: #130f15; border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 16px 10px; gap: 18px; min-height: 0; }
-  .brand { display: flex; gap: 10px; align-items: center; padding: 0 8px; }
-  .name { font-weight: 700; font-size: 15px; }
   nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; }
   .nav { display: flex; align-items: center; gap: 8px; text-align: left; background: transparent; border: none; padding: 9px 10px; border-radius: 8px; font-weight: 500; }
   .nav:hover:not(:disabled) { background: var(--panel); }
