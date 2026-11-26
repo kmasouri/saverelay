@@ -59,8 +59,25 @@ async function dirSize(dir: string): Promise<number> {
   return total
 }
 
+/** An incoming save that hasn't fully arrived yet. */
+export interface Download {
+  haveBytes: number
+  totalBytes: number
+  /** Who made the save being downloaded (never this PC). */
+  fromDeviceIds: string[]
+  /** When that save was written. */
+  savedAt: number
+  /** Nobody who could send it is online. */
+  paused: boolean
+  /** Rough time left at the recent speed; null until there's a speed to go on. */
+  etaSeconds: number | null
+}
+
 interface Runtime {
   status: WorldStatus
+  download?: Download | null
+  /** Last progress reading, for the speed estimate. */
+  downloadSample?: { contentId: string; at: number; haveBytes: number; rate: number }
   detail: string
   warnings: string[]
   resolution: Resolution | null
@@ -383,10 +400,24 @@ export class Engine extends EventEmitter {
 
   // ---- per-world tick ------------------------------------------------------
 
+  /** Seconds left at a smoothed recent speed, or null when there's nothing to go on. */
+  private estimate(rt: Runtime, contentId: string, haveBytes: number, totalBytes: number, moving: boolean): number | null {
+    const now = this.now()
+    const prev = rt.downloadSample
+    let rate = 0
+    if (prev && prev.contentId === contentId && now > prev.at) {
+      const instant = Math.max(0, haveBytes - prev.haveBytes) / ((now - prev.at) / 1000)
+      rate = prev.rate ? prev.rate * 0.7 + instant * 0.3 : instant
+    }
+    rt.downloadSample = { contentId, at: now, haveBytes, rate }
+    return moving && rate > 0 ? Math.ceil((totalBytes - haveBytes) / rate) : null
+  }
+
   private setStatus(worldId: string, status: WorldStatus, detail = ''): void {
     const rt = this.runtimes.get(worldId)!
     rt.status = status
     rt.detail = detail
+    if (status !== 'waiting-for-peer') rt.download = null
   }
 
   private notifyOnce(worldId: string, key: string, title: string, body: string): void {
@@ -558,8 +589,17 @@ export class Engine extends EventEmitter {
     for (const f of accepted.files) if (!(await store.hasObject(f.sha256, f.size))) missing.push(f)
     if (missing.length) {
       const friendOnline = this.cfg.peers.some((p) => !p.removed && w.sharedWith.includes(p.deviceId) && this.connections[p.syncthingId])
-      const have = accepted.files.length - missing.length
-      this.setStatus(w.id, 'waiting-for-peer', `Downloading ${have} of ${accepted.files.length} files${friendOnline ? '.' : '. Paused until a friend is online.'}`)
+      const totalBytes = accepted.files.reduce((n, f) => n + f.size, 0)
+      const haveBytes = totalBytes - missing.reduce((n, f) => n + f.size, 0)
+      this.setStatus(w.id, 'waiting-for-peer', friendOnline ? 'Downloading the latest save.' : 'Paused until a friend is online.')
+      rt.download = {
+        haveBytes,
+        totalBytes,
+        fromDeviceIds: accepted.deviceIds.filter((id) => id !== this.cfg.identity.deviceId),
+        savedAt: accepted.modifiedAt,
+        paused: !friendOnline,
+        etaSeconds: this.estimate(rt, accepted.contentId, haveBytes, totalBytes, friendOnline),
+      }
       return
     }
 
@@ -883,6 +923,13 @@ export class Engine extends EventEmitter {
           pendingUpdate: rt?.pendingUpdate ?? false,
           policy: res?.policy ?? { policy: 'ask' as Policy, keepVersions: DEFAULT_KEEP_VERSIONS },
           storageBytes: this.storage.get(w.id) ?? null,
+          download: rt?.download
+            ? {
+                ...rt.download,
+                fromNames: rt.download.fromDeviceIds.map((id) => this.cfg.peers.find((p) => p.deviceId === id)?.name ?? 'a friend'),
+                fromLastSeenAt: Math.max(0, ...rt.download.fromDeviceIds.map((id) => this.lastSeen[this.cfg.peers.find((p) => p.deviceId === id)?.syncthingId ?? ''] ?? 0)),
+              }
+            : null,
           conflict: res?.state === 'conflict' ? candidates : null,
           autoNote: res?.state === 'auto-resolved' ? res.note : null,
           acceptedContentId: res && 'accepted' in res ? res.accepted.contentId : null,

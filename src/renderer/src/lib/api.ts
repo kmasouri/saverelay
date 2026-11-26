@@ -36,12 +36,33 @@ export interface World {
   policy: { policy: Policy; preferredDeviceId?: string; keepVersions: number; setBy?: string; setAt?: number }
   /** Space this save takes on this PC (history and backups); null until first counted. */
   storageBytes: number | null
+  download: Download | null
   conflict: Candidate[] | null
   autoNote: string | null
   acceptedContentId: string | null
   liveContentId: string | null
   lastAppliedAt: number
   lastCaptureAt: number
+}
+
+export interface Download {
+  haveBytes: number
+  totalBytes: number
+  fromNames: string[]
+  fromLastSeenAt: number
+  savedAt: number
+  paused: boolean
+  etaSeconds: number | null
+}
+
+export const downloadPercent = (d: Download): number => (d.totalBytes ? Math.floor((d.haveBytes / d.totalBytes) * 100) : 0)
+
+/** "DefectiveWombat's save from Nov 26 · 480 MB of 843 MB · about 2 min left", or why it's paused. */
+export function downloadLine(d: Download): string {
+  const from = d.fromNames.length ? d.fromNames.join(' and ') : 'a friend'
+  if (d.paused) return `Continues when ${from} ${d.fromNames.length > 1 ? 'are' : 'is'} online${d.fromLastSeenAt ? ` · last online ${when(d.fromLastSeenAt)}` : ''}`
+  const eta = d.etaSeconds === null ? '' : d.etaSeconds < 60 ? ' · less than a minute left' : ` · about ${d.etaSeconds < 3600 ? `${Math.round(d.etaSeconds / 60)} min` : `${(d.etaSeconds / 3600).toFixed(1)} h`} left`
+  return `${d.fromNames.length ? `${from}’s` : 'The'} save from ${when(d.savedAt)} · ${bytes(d.haveBytes)} of ${bytes(d.totalBytes)}${eta}`
 }
 
 export interface Game {

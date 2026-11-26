@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { bytes, call, exact, POLICY_LABEL, splitList, when, type AppState, type Graph, type GraphNode, type Policy, type World } from '../lib/api'
+  import { bytes, call, downloadLine, exact, POLICY_LABEL, splitList, when, type AppState, type Graph, type GraphNode, type Policy, type World } from '../lib/api'
   import HistoryGraph from '../lib/HistoryGraph.svelte'
   import StatusBadge from '../lib/StatusBadge.svelte'
 
@@ -68,9 +68,9 @@
   <div class="stack tight grow">
     <div class="row">
       <h1 class="ellipsis">{world.name}</h1>
-      <StatusBadge status={world.status} />
+      <StatusBadge status={world.status} download={world.download} />
     </div>
-    <p class="muted">{world.detail || `${gameName} · shared with ${world.sharedWith.length} friend${world.sharedWith.length === 1 ? '' : 's'}`}</p>
+    <p class="muted">{world.download ? downloadLine(world.download) : world.detail || `${gameName} · shared with ${world.sharedWith.length} friend${world.sharedWith.length === 1 ? '' : 's'}`}</p>
   </div>
   <button onclick={() => act(() => call('openPath', world.localPath))}>Open folder</button>
 </header>
