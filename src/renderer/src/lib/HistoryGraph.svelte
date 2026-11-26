@@ -16,7 +16,9 @@
 
   const rows = $derived(graph.nodes.slice(0, limit))
   const byId = $derived(new Map(graph.nodes.map((n) => [n.id, n])))
-  const hasRestore = $derived(rows.some((n) => n.restoredFrom))
+  /** A restore of the version right below it is already joined by the solid line; only a jump back further needs the dashed one. */
+  const jumpsBack = (n: GraphNode): boolean => !!n.restoredFrom && n.restoredFrom !== n.parentId && byId.has(n.restoredFrom)
+  const hasRestore = $derived(rows.some(jumpsBack))
   const restoreLane = $derived(graph.lanes)
   const width = $derived(LANE * (graph.lanes + (hasRestore ? 1 : 0)) + 8)
 
@@ -33,7 +35,9 @@
     const who = name(n.deviceId)
     if (n.kind === 'restore') {
       const from = n.restoredFrom ? byId.get(n.restoredFrom) : undefined
-      return from ? `${who} brought back the save from ${when(from.savedAt)}` : `${who} brought back an older save`
+      if (!from) return `${who} restored an older save`
+      const owner = from.deviceId === n.deviceId ? (who === 'You' ? 'your' : 'their') : `${name(from.deviceId)}'s`
+      return `${who} restored ${owner} save from ${when(from.savedAt)}`
     }
     if (!n.parentId) return n.main ? `${who} started sharing` : `${who} shared their own save`
     return n.main ? `${who} played` : `${who} played separately`
@@ -55,10 +59,11 @@
 
   /** Dashed line from a restored version up to the restore, routed outside the other lanes. */
   function restoreEdge(n: GraphNode): string | null {
-    const s = n.restoredFrom ? byId.get(n.restoredFrom) : undefined
-    if (!s) return null
+    if (!jumpsBack(n)) return null
+    const s = byId.get(n.restoredFrom!)!
     const rx = x(restoreLane)
-    const [xs, ys, xn, yn] = [x(s.lane) + DOT, y(s.row), x(n.lane) + DOT + 6, y(n.row)]
+    // Stop short of the dot (and the Latest ring) so the arrowhead sits beside it.
+    const [xs, ys, xn, yn] = [x(s.lane) + DOT, y(s.row), x(n.lane) + DOT + (n.latest ? 9 : 4), y(n.row)]
     return `M ${xs} ${ys} H ${rx - CURVE} Q ${rx} ${ys} ${rx} ${ys - CURVE} V ${yn + CURVE} Q ${rx} ${yn} ${rx - CURVE} ${yn} H ${xn}`
   }
 </script>
@@ -66,7 +71,7 @@
 <div class="graph" style="--row: {ROW}px">
   <svg width={width} height={rows.length * ROW} aria-hidden="true">
     <defs>
-      <marker id="arrow" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
         <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ok)" />
       </marker>
     </defs>
@@ -109,7 +114,7 @@
 <div class="legend small muted">
   <span><i class="swatch main"></i>The shared game</span>
   {#if graph.lanes > 1}<span><i class="swatch"></i>Played separately</span>{/if}
-  {#if hasRestore}<span><i class="swatch dashed"></i>Brought back</span>{/if}
+  {#if hasRestore}<span><i class="swatch dashed"></i>Restored from here</span>{/if}
 </div>
 
 <style>
