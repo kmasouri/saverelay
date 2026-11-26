@@ -87,7 +87,7 @@
       <div class="row">
         <span class="badge {p.connected ? 'ok' : ''}">{p.connected ? 'online' : 'offline'}</span>
         <strong>{p.name}</strong>
-        <span class="faint small">added {when(p.addedAt)}</span>
+        {#if !p.connected}<span class="faint small">{p.lastSeenAt ? `last online ${when(p.lastSeenAt)}` : 'not connected yet'}</span>{/if}
       </div>
       <button class="ghost danger" onclick={() => remove(p.deviceId, p.name)}>Remove</button>
     </div>

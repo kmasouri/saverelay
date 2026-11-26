@@ -231,6 +231,12 @@ export class Syncthing {
     return Object.entries(raw ?? {}).map(([deviceId, v]) => ({ deviceId, name: v.name ?? '', address: v.address ?? '' }))
   }
 
+  /** When each device was last connected, as Syncthing remembers it across restarts (0 = never). */
+  async lastSeen(): Promise<Record<string, number>> {
+    const raw = await this.get<Record<string, { lastSeen?: string }>>('/rest/stats/device')
+    return Object.fromEntries(Object.entries(raw ?? {}).map(([id, s]) => [id, Math.max(0, Date.parse(s.lastSeen ?? '') || 0)]))
+  }
+
   async connections(): Promise<Record<string, boolean>> {
     const raw = await this.get<{ connections: Record<string, { connected: boolean }> }>('/rest/system/connections')
     return Object.fromEntries(Object.entries(raw.connections ?? {}).map(([id, c]) => [id, c.connected]))

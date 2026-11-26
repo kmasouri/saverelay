@@ -134,7 +134,7 @@
       <label class="check">
         <input type="checkbox" checked={world.sharedWith.includes(p.deviceId)} onchange={(e) => toggleShare(p.deviceId, e.currentTarget.checked)} />
         <span class="grow">{p.name}</span>
-        <span class="small muted row presence"><i class="dot" class:on={p.connected}></i>{p.connected ? 'online' : 'offline'}</span>
+        <span class="small muted row presence"><i class="dot" class:on={p.connected}></i>{p.connected ? 'online' : p.lastSeenAt ? `last online ${when(p.lastSeenAt)}` : 'offline'}</span>
       </label>
     {/each}
   </div>

@@ -86,6 +86,7 @@ export class Engine extends EventEmitter {
   private pendingDevices: { deviceId: string; name: string; address: string }[] = []
   private pendingFolders: { folderId: string; label: string; offeredBy: string[] }[] = []
   private connections: Record<string, boolean> = {}
+  private lastSeen: Record<string, number> = {}
   /** Worlds whose staging store changed locally since the transport last scanned it. */
   private dirty = new Set<string>()
   private readonly now: () => number
@@ -283,6 +284,7 @@ export class Engine extends EventEmitter {
     }
     try {
       this.connections = await st.connections()
+      this.lastSeen = await st.lastSeen()
       this.pendingDevices = (await st.pendingDevices()).filter((d) => !this.cfg.peers.some((p) => p.syncthingId === d.deviceId && !p.removed))
       const offers = await st.pendingFolders()
       this.pendingFolders = []
@@ -772,7 +774,10 @@ export class Engine extends EventEmitter {
       transport: { ok: !this.transportError, error: this.transportError },
       peers: this.cfg.peers
         .filter((p) => !p.removed)
-        .map((p) => ({ deviceId: p.deviceId, name: p.name, connected: !!this.connections[p.syncthingId], addedAt: p.addedAt })),
+        .map((p) => {
+          const connected = !!this.connections[p.syncthingId]
+          return { deviceId: p.deviceId, name: p.name, connected, lastSeenAt: connected ? this.now() : (this.lastSeen[p.syncthingId] ?? 0), addedAt: p.addedAt }
+        }),
       pendingDevices: this.pendingDevices,
       invitations: this.pendingFolders.map((f) => ({
         folderId: f.folderId,

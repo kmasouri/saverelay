@@ -54,6 +54,9 @@ class FakeNet {
       async connections() {
         return Object.fromEntries([...net.folders.keys()].map((id) => [id, !net.offline.has(id)]))
       },
+      async lastSeen() {
+        return {}
+      },
     }
     return fake as unknown as Syncthing
   }

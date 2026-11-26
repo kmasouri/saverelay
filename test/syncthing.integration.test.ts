@@ -93,6 +93,7 @@ describe.skipIf(!BIN)('real Syncthing transport', () => {
     await a.engine.start(1000)
     await b.engine.start(1000)
     await until('devices to connect', async () => a.engine.snapshot().peers[0]?.connected === true)
+    await until('Alice to record when she last saw Bob', async () => ((await a.st.lastSeen())[b.st.myId] ?? 0) > 0, 30_000)
 
     await writeFile(join(a.saves, 'world.sav'), 'alice-progress-1')
     const bobId = a.engine.config.peers[0].deviceId
