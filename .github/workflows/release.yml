@@ -25,6 +25,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: node scripts/fetch-syncthing.mjs win32 x64
+      - run: node scripts/brand-syncthing.mjs
       - run: npm run build
       - name: Package installer
         run: npx electron-builder --win --x64 --publish never
@@ -58,6 +59,9 @@ jobs:
           }
           function Show-Log { if (Test-Path $log) { Get-Content $log | Select-Object -Last 40 } }
           function Fail($msg) { Show-Log; Get-Process -Name "SaveRelay","syncthing" -ErrorAction SilentlyContinue | Stop-Process -Force; throw $msg }
+
+          $desc = (Get-Item "dist/win-unpacked/resources/syncthing/syncthing.exe").VersionInfo.FileDescription
+          if ($desc -ne "SaveRelay Sync") { throw "Bundled Syncthing is labelled '$desc', expected 'SaveRelay Sync'" }
 
           # 1. Starts cleanly and quits leaving nothing running.
           Start-Process -FilePath $exe -ArgumentList "--hidden"
