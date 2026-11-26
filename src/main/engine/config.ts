@@ -32,6 +32,8 @@ export interface WorldConfig {
 export interface AppConfig {
   version: 1
   deviceName: string
+  /** False until the person picks the name friends see, so we can ask instead of showing the PC name. */
+  nameChosen?: boolean
   identity: Identity
   syncthingApiKey: string
   peers: Peer[]
@@ -42,13 +44,18 @@ export interface AppConfig {
 export async function loadConfig(path: string): Promise<AppConfig> {
   try {
     const cfg = JSON.parse(await readFile(path, 'utf8')) as AppConfig
-    if (cfg.version === 1 && cfg.identity?.privateKey) return cfg
+    if (cfg.version === 1 && cfg.identity?.privateKey) {
+      // Older configs: a name that isn't the PC's own was picked by the person.
+      cfg.nameChosen ??= cfg.deviceName !== defaultName()
+      return cfg
+    }
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
   }
   const cfg: AppConfig = {
     version: 1,
-    deviceName: hostname().slice(0, 64) || 'My PC',
+    deviceName: defaultName(),
+    nameChosen: false,
     identity: newIdentity(),
     syncthingApiKey: randomBytes(24).toString('base64url'),
     peers: [],
@@ -57,6 +64,10 @@ export async function loadConfig(path: string): Promise<AppConfig> {
   }
   await saveConfig(path, cfg)
   return cfg
+}
+
+function defaultName(): string {
+  return hostname().slice(0, 64) || 'My PC'
 }
 
 export function saveConfig(path: string, cfg: AppConfig): Promise<void> {

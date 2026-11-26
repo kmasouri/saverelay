@@ -530,6 +530,7 @@ export class Engine extends EventEmitter {
     const trimmed = name.trim().slice(0, 64)
     if (!trimmed) throw new Error('Device name cannot be empty')
     this.cfg.deviceName = trimmed
+    this.cfg.nameChosen = true
     await this.persistConfig()
   }
 
@@ -762,6 +763,7 @@ export class Engine extends EventEmitter {
     return {
       device: {
         name: this.cfg.deviceName,
+        nameChosen: !!this.cfg.nameChosen,
         deviceId: this.cfg.identity.deviceId,
         syncthingId: this.deps.syncthing?.myId ?? '',
         invite: this.deps.syncthing?.myId ? this.invite() : '',

@@ -12,6 +12,7 @@
 
   let ui = $state<AppState | null>(null)
   let route = $state<Route>({ kind: 'overview' })
+  let screenName = $state('')
   let toast = $state<{ text: string; tone: 'ok' | 'bad' } | null>(null)
   let toastTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -49,6 +50,14 @@
 
 {#if !ui}
   <div class="loading"><Logo size={42} spin /></div>
+{:else if !ui.device.nameChosen}
+  <form class="welcome card stack" onsubmit={(e) => { e.preventDefault(); void act(() => call('setDeviceName', screenName)) }}>
+    <Logo size={42} />
+    <h1>What should your friends call you?</h1>
+    <p class="muted">They see this name next to your saves. You can change it later on the Friends page.</p>
+    <input bind:value={screenName} maxlength="64" placeholder="Your name" aria-label="Your name" />
+    <button class="primary" type="submit" disabled={!screenName.trim()}>Continue</button>
+  </form>
 {:else}
   <div class="shell">
     <aside>
@@ -137,6 +146,8 @@
   .dot.on { background: var(--ok); }
   main { overflow-y: auto; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .banner { display: flex; gap: 8px; flex-wrap: wrap; }
+  .welcome { width: min(440px, 90vw); margin: 15vh auto 0; padding: 28px; align-items: flex-start; }
+  .welcome input { width: 100%; }
   .loading { height: 100%; display: grid; place-items: center; }
   .toast { position: fixed; bottom: 20px; right: 20px; max-width: 420px; padding: 12px 16px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); box-shadow: 0 10px 30px #0008; }
   .toast.ok { border-color: color-mix(in srgb, var(--ok) 60%, var(--line)); }

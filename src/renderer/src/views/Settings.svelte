@@ -4,9 +4,6 @@
   type Act = <T>(fn: () => Promise<T>, success?: string) => Promise<T | undefined>
   let { ui, act }: { ui: AppState; act: Act } = $props()
 
-  const initialName = (): string => ui.device.name
-  let name = $state(initialName())
-
   async function exportDiagnostics(): Promise<void> {
     const file = await act(() => call<string | null>('exportDiagnostics'))
     if (file) act(async () => undefined, `Saved to ${file}`)
@@ -21,14 +18,6 @@
 
 <section class="card stack">
   <h2>This PC</h2>
-  <label class="field">
-    <span>Name your friends see</span>
-    <div class="row">
-      <input bind:value={name} maxlength="64" />
-      <button disabled={!name.trim() || name === ui.device.name} onclick={() => act(() => call('setDeviceName', name), 'Name saved')}>Save</button>
-    </div>
-  </label>
-  <p class="faint small">Friends see the name from the invite code they pasted. A new name shows on versions you publish from now on.</p>
   <label class="check">
     <input type="checkbox" checked={ui.device.startAtLogin} onchange={(e) => act(() => call('setStartAtLogin', e.currentTarget.checked))} />
     Start SaveRelay in the tray when I sign in (recommended, so saves sync without you opening it)

@@ -4,6 +4,8 @@
   type Act = <T>(fn: () => Promise<T>, success?: string) => Promise<T | undefined>
   let { ui, act }: { ui: AppState; act: Act } = $props()
 
+  const initialName = (): string => ui.device.name
+  let name = $state(initialName())
   let code = $state('')
   let copied = $state(false)
 
@@ -32,6 +34,15 @@
   <h1>Friends</h1>
   <p class="muted">Friends trust each other by swapping invite codes. Saves only travel between friends who added each other, and only for saves you share with them.</p>
 </header>
+
+<section class="card stack">
+  <h2>Your name</h2>
+  <div class="row">
+    <input class="grow" bind:value={name} maxlength="64" aria-label="Your name" />
+    <button disabled={!name.trim() || name.trim() === ui.device.name} onclick={() => act(() => call('setDeviceName', name), 'Name saved')}>Save</button>
+  </div>
+  <p class="faint small">What your friends see. They get a new name with your next save or invite code.</p>
+</section>
 
 <section class="two">
   <div class="card stack">

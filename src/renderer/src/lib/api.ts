@@ -60,7 +60,7 @@ export interface UpdateState {
 }
 
 export interface AppState {
-  device: { name: string; deviceId: string; syncthingId: string; invite: string; startAtLogin: boolean }
+  device: { name: string; nameChosen: boolean; deviceId: string; syncthingId: string; invite: string; startAtLogin: boolean }
   transport: { ok: boolean; error: string | null }
   peers: { deviceId: string; name: string; connected: boolean; addedAt: number }[]
   pendingDevices: { deviceId: string; name: string; address: string }[]
