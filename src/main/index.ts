@@ -182,7 +182,6 @@ async function main(): Promise<void> {
     chooseCandidate: (id, contentId) => engine.chooseCandidate(str(id, 64), str(contentId, 64)),
     restore: (id, contentId) => engine.restore(str(id, 64), str(contentId, 64)),
     history: (id) => engine.history(str(id, 64)),
-    backupNow: (id) => engine.backupNow(str(id, 64)),
     openPath: async (p) => {
       const path = str(p)
       const allowed = path.startsWith(dataDir) || engine.config.worlds.some((w) => w.localPath === path)

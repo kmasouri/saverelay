@@ -11,13 +11,14 @@ import { EventEmitter } from 'node:events'
 import { lstat, readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { basename, join, resolve as resolvePath } from 'node:path'
 import { GAMES, gameById } from '../../core/games'
+import { buildGraph, type Graph } from '../../core/graph'
 import { buildHistory, type ContentGroup } from '../../core/history'
 import { decodeInvite, encodeInvite, signEvent } from '../../core/identity'
 import { contentIdOf } from '../../core/manifest'
 import { globToRegExp } from '../../core/paths'
 import { resolve, type Candidate, type Resolution } from '../../core/reconcile'
-import { SCHEMA, isVersion, type FileEntry, type Policy, type SyncEvent } from '../../core/types'
-import { applySnapshot, backupFolder, recoverJournal } from './applier'
+import { SCHEMA, compareEvents, isVersion, type FileEntry, type Policy, type SyncEvent } from '../../core/types'
+import { applySnapshot, recoverJournal } from './applier'
 import { loadConfig, saveConfig, type AppConfig, type WorldConfig } from './config'
 import { isGameRunning, type ProcessDetector } from './process'
 import { scanFolder, type Scan } from './scanner'
@@ -345,6 +346,7 @@ export class Engine extends EventEmitter {
 
       const keys = this.keyMap()
       let { events, rejected } = await store.loadEvents(keys)
+      await this.learnPeerNames(events)
       rt.warnings = rejected.slice(0, 5)
       let res = resolve(events)
       rt.resolution = res
@@ -430,6 +432,21 @@ export class Engine extends EventEmitter {
     return true
   }
 
+  /** Friends can rename their PC; follow the newest name their signed events carry. */
+  private async learnPeerNames(events: SyncEvent[]): Promise<void> {
+    const latest = new Map<string, string>()
+    for (const e of [...events].sort(compareEvents)) latest.set(e.deviceId, e.deviceName)
+    let changed = false
+    for (const p of this.cfg.peers) {
+      const name = latest.get(p.deviceId)
+      if (name && name !== p.name) {
+        p.name = name
+        changed = true
+      }
+    }
+    if (changed) await this.persistConfig()
+  }
+
   private unstable(st: WorldState): false {
     st.pendingSig = null
     return false
@@ -469,7 +486,9 @@ export class Engine extends EventEmitter {
     const missing: FileEntry[] = []
     for (const f of accepted.files) if (!(await store.hasObject(f.sha256, f.size))) missing.push(f)
     if (missing.length) {
-      this.setStatus(w.id, 'waiting-for-peer', `Receiving ${missing.length} of ${accepted.files.length} file(s) from ${accepted.deviceNames.join(', ')}.`)
+      const friendOnline = this.cfg.peers.some((p) => !p.removed && w.sharedWith.includes(p.deviceId) && this.connections[p.syncthingId])
+      const have = accepted.files.length - missing.length
+      this.setStatus(w.id, 'waiting-for-peer', `Downloading ${have} of ${accepted.files.length} files${friendOnline ? '.' : '. Paused until a friend is online.'}`)
       return
     }
 
@@ -689,7 +708,7 @@ export class Engine extends EventEmitter {
 
   // ---- read models ---------------------------------------------------------
 
-  async history(worldId: string): Promise<{ groups: (ContentGroup & { accepted: boolean; live: boolean })[]; decisions: unknown[] }> {
+  async history(worldId: string): Promise<{ groups: (ContentGroup & { accepted: boolean; live: boolean })[]; decisions: unknown[]; graph: Graph }> {
     this.world(worldId)
     const st = this.states.get(worldId)!
     const { events } = await this.stores.get(worldId)!.loadEvents(this.keyMap())
@@ -701,7 +720,7 @@ export class Engine extends EventEmitter {
       .sort((a, b) => b.at - a.at)
       .slice(0, 50)
       .map((e) => ({ ...e, sig: undefined }))
-    return { groups, decisions }
+    return { groups, decisions, graph: buildGraph(events) }
   }
 
   async discover(): Promise<{ gameId: string; gameName: string; name: string; path: string; added: boolean; lastPlayedAt: number }[]> {
@@ -792,13 +811,6 @@ export class Engine extends EventEmitter {
     return { generatedAt: new Date(this.now()).toISOString(), platform: process.platform, deviceId: identity.deviceId, config: safe, transportError: this.transportError, worlds }
   }
 
-  /** Backs up the live folder on demand (used before risky user actions). */
-  async backupNow(worldId: string): Promise<string> {
-    const w = this.world(worldId)
-    const dir = this.backupDir(w.id, 'manual')
-    await backupFolder(w.localPath, w.include, w.exclude, dir)
-    return dir
-  }
-}
+  /** Backs up the live folder on demand (used before risky user actions). */}
 
 export type EngineSnapshot = ReturnType<Engine['snapshot']>

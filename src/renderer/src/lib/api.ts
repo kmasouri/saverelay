@@ -102,6 +102,29 @@ export interface Discovered {
   lastPlayedAt: number
 }
 
+export interface GraphNode {
+  id: string
+  contentId: string
+  kind: 'capture' | 'restore'
+  reason: 'local' | 'import' | 'restore'
+  deviceId: string
+  at: number
+  savedAt: number
+  parentId: string | null
+  restoredFrom: string | null
+  main: boolean
+  latest: boolean
+  lane: number
+  row: number
+  here: string[]
+}
+
+export interface Graph {
+  nodes: GraphNode[]
+  lanes: number
+  names: Record<string, string>
+}
+
 export interface WorldInput {
   name: string
   gameId: string
@@ -128,18 +151,18 @@ export function call<T = void>(name: string, ...args: unknown[]): Promise<T> {
 
 export const STATUS_LABEL: Record<WorldStatus, string> = {
   'setting-up': 'Setting up',
-  'up-to-date': 'Up to date',
+  'up-to-date': 'Ready to play',
   playing: 'Playing',
-  'waiting-for-peer': 'Waiting for peer',
-  'pending-update': 'Pending update',
-  conflict: 'Conflict',
-  error: 'Error',
+  'waiting-for-peer': 'Downloading',
+  'pending-update': 'Updating',
+  conflict: 'Pick a version',
+  error: 'Problem',
 }
 
 export const POLICY_LABEL: Record<Policy, string> = {
-  ask: 'Preserve both and ask',
-  'latest-modified': 'Latest modified wins',
-  'preferred-device': 'Preferred device wins',
+  ask: 'Ask everyone to pick one',
+  'latest-modified': 'Newest save wins',
+  'preferred-device': "One person's save wins",
 }
 
 export function when(ms: number): string {
