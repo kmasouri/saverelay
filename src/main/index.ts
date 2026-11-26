@@ -134,6 +134,9 @@ async function main(): Promise<void> {
       show: false,
       title: 'SaveRelay',
       backgroundColor: '#17131a',
+      // The page draws the title bar; Windows keeps its own buttons, drawn over the top-right corner.
+      titleBarStyle: 'hidden',
+      titleBarOverlay: { color: '#130f15', symbolColor: '#a99ca6', height: 36 },
       icon: join(resources, 'icon.png'),
       autoHideMenuBar: true,
       webPreferences: {
