@@ -67,7 +67,7 @@ export interface AppState {
   invitations: { folderId: string; label: string; offeredBy: string[] }[]
   games: Game[]
   worlds: World[]
-  app: { version: string; packaged: boolean; logFile: string }
+  app: { version: string; packaged: boolean; logFile: string; crashedLastTime: boolean }
   update: UpdateState
 }
 

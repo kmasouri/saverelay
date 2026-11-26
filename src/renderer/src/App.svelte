@@ -13,6 +13,7 @@
   let ui = $state<AppState | null>(null)
   let route = $state<Route>({ kind: 'overview' })
   let screenName = $state('')
+  let crashSeen = $state(false)
   let toast = $state<{ text: string; tone: 'ok' | 'bad' } | null>(null)
   let toastTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -97,6 +98,15 @@
     </aside>
 
     <main>
+      {#if ui.app.crashedLastTime && !crashSeen}
+        <div class="card alert banner row spread">
+          <span>SaveRelay closed unexpectedly last time.</span>
+          <div class="row">
+            <button onclick={() => act(() => call('showLog'))}>Show crash log</button>
+            <button class="ghost" onclick={() => (crashSeen = true)}>Dismiss</button>
+          </div>
+        </div>
+      {/if}
       {#if !ui.transport.ok}
         <div class="card danger banner">
           <strong>Sync transport problem.</strong>

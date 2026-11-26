@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, shell, Tray, type IpcMainInvokeEvent } from 'electron'
-import { existsSync } from 'node:fs'
+import { existsSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { uptime } from 'node:os'
 import { writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,7 +18,23 @@ const here = dirname(fileURLToPath(import.meta.url))
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  void main()
+  main().catch((err) => {
+    // Never linger invisibly: a hidden copy holds the single-instance lock and blocks every relaunch.
+    const logFile = join(app.getPath('userData'), 'logs', 'main.log')
+    const detail = err instanceof Error ? (err.stack ?? err.message) : String(err)
+    createLogger(dirname(logFile)).log(`Startup failed: ${detail}`)
+    const choice = dialog.showMessageBoxSync({
+      type: 'error',
+      title: 'SaveRelay',
+      message: 'SaveRelay could not start',
+      detail: `${err instanceof Error ? err.message : String(err)}\n\nThe crash log has the details.`,
+      buttons: ['Show crash log', 'Quit'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    if (choice === 0) shell.showItemInFolder(logFile)
+    app.exit(1)
+  })
 }
 
 async function main(): Promise<void> {
@@ -28,6 +45,16 @@ async function main(): Promise<void> {
   const logger = createLogger(join(dataDir, 'logs'))
   const log = logger.log
   log(`SaveRelay ${app.getVersion()} starting on ${process.platform}-${process.arch}`)
+  // A marker that only a clean exit removes. Still there from before the PC last
+  // started means a shutdown, not a crash.
+  const runningMarker = join(dataDir, 'running')
+  const bootedAt = Date.now() - uptime() * 1000
+  const crashedLastTime = (statSync(runningMarker, { throwIfNoEntry: false })?.mtimeMs ?? 0) > bootedAt
+  if (crashedLastTime) log('The previous run did not exit cleanly')
+  writeFileSync(runningMarker, String(process.pid))
+  const cleanExit = (): void => rmSync(runningMarker, { force: true })
+  process.on('uncaughtException', (err) => log(`Uncaught error: ${err.stack ?? err.message}`))
+  process.on('unhandledRejection', (err) => log(`Unhandled rejection: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`))
 
   const resources = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
   const exe = process.platform === 'win32' ? 'syncthing.exe' : 'syncthing'
@@ -137,7 +164,7 @@ async function main(): Promise<void> {
   // ---- state push ------------------------------------------------------------
 
   let pushTimer: NodeJS.Timeout | null = null
-  const fullState = () => ({ ...engine.snapshot(), app: { version: app.getVersion(), packaged: app.isPackaged, logFile: logger.file }, update: updater.state })
+  const fullState = () => ({ ...engine.snapshot(), app: { version: app.getVersion(), packaged: app.isPackaged, logFile: logger.file, crashedLastTime }, update: updater.state })
   const push = (): void => {
     if (pushTimer) return
     pushTimer = setTimeout(() => {
@@ -187,6 +214,7 @@ async function main(): Promise<void> {
       const allowed = path.startsWith(dataDir) || engine.config.worlds.some((w) => w.localPath === path)
       if (allowed) await shell.openPath(path)
     },
+    showLog: () => shell.showItemInFolder(logger.file),
     exportDiagnostics: async () => {
       const res = await dialog.showSaveDialog(win!, { defaultPath: `saverelay-diagnostics-${Date.now()}.json` })
       if (res.canceled || !res.filePath) return null
@@ -224,6 +252,7 @@ async function main(): Promise<void> {
       engineRef.current = null
       await syncthing?.stop()
       syncthing = null
+      cleanExit()
       app.quit()
     }
     void shutdown()

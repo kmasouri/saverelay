@@ -112,4 +112,26 @@ describe.skipIf(!BIN)('real Syncthing transport', () => {
     const { groups } = await a.engine.history(a.engine.snapshot().worlds[0].id)
     expect(groups.map((g) => g.contributions[0].deviceName)).toEqual(['Bob', 'Alice'])
   })
+
+  it('takes over from a copy left running by a crashed app', { timeout: 120_000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'saverelay-st-'))
+    cleanup.push(() => rm(root, { recursive: true, force: true }))
+    const make = (): Syncthing =>
+      new Syncthing({
+        binary: BIN!,
+        home: join(root, 'st'),
+        apiKey: 'key-leftover-0123456789',
+        log: (m) => logs.push(`Leftover ${m}`),
+        options: { globalAnnounceEnabled: false, localAnnounceEnabled: false, relaysEnabled: false, natEnabled: false },
+      })
+    const leftover = make()
+    await leftover.start()
+    cleanup.push(() => leftover.stop())
+    const fresh = make()
+    await fresh.start()
+    cleanup.push(() => fresh.stop())
+    expect(fresh.running).toBe(true)
+    expect(fresh.myId).toBe(leftover.myId)
+    await until('the leftover copy to exit', async () => !leftover.running, 15_000)
+  })
 })

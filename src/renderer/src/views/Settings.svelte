@@ -51,7 +51,7 @@
   <h2>Troubleshooting</h2>
   <div class="row wrap">
     <button onclick={exportDiagnostics}>Export diagnostics…</button>
-    <button onclick={() => act(() => call('openPath', ui.app.logFile))}>Open log</button>
+    <button onclick={() => act(() => call('showLog'))}>Show log</button>
   </div>
   <p class="faint small">Diagnostics include your config and sync state, but never your private key.</p>
   <div class="small faint mono">Device {ui.device.deviceId}<br />Transport {ui.device.syncthingId || 'not running'}</div>

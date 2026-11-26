@@ -4,7 +4,8 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 
 export interface SyncthingOptions {
   binary: string
@@ -44,8 +45,38 @@ export class Syncthing {
   constructor(private readonly opts: SyncthingOptions) {}
 
   async start(): Promise<void> {
+    try {
+      await this.launch()
+    } catch (err) {
+      // A copy left running by a crashed SaveRelay holds the lock on our home folder.
+      if (!this.lockedOut || !(await this.stopLeftover())) throw err
+      this.opts.log('[syncthing] stopped a copy left running from before; starting again')
+      await this.launch()
+    }
+  }
+
+  private lockedOut = false
+  private get portFile(): string {
+    return join(this.opts.home, 'saverelay-gui-port')
+  }
+
+  /** Asks a leftover instance to shut down through the API port it was started with. */
+  private async stopLeftover(): Promise<boolean> {
+    const port = Number((await readFile(this.portFile, 'utf8').catch(() => '')).trim())
+    if (!port) return false
+    try {
+      await fetch(`http://127.0.0.1:${port}/rest/system/shutdown`, { method: 'POST', headers: { 'X-API-Key': this.opts.apiKey }, signal: AbortSignal.timeout(5_000) })
+    } catch {
+      return false
+    }
+    await new Promise((r) => setTimeout(r, 3_000))
+    return true
+  }
+
+  private async launch(): Promise<void> {
     await mkdir(this.opts.home, { recursive: true })
     const port = await freePort()
+    this.lockedOut = false
     this.base = `http://127.0.0.1:${port}`
     this.stopping = false
     const child = spawn(
@@ -55,7 +86,11 @@ export class Syncthing {
     )
     this.child = child
     const forward = (buf: Buffer): void => {
-      for (const line of buf.toString().split(/\r?\n/)) if (line.trim()) this.opts.log(`[syncthing] ${line}`)
+      for (const line of buf.toString().split(/\r?\n/)) {
+        if (!line.trim()) continue
+        if (line.includes('Failed to acquire lock')) this.lockedOut = true
+        this.opts.log(`[syncthing] ${line}`)
+      }
     }
     child.stdout?.on('data', forward)
     child.stderr?.on('data', forward)
@@ -70,6 +105,7 @@ export class Syncthing {
       try {
         const status = await this.get<{ myID: string }>('/rest/system/status')
         this.myId = status.myID
+        await writeFile(this.portFile, String(port)).catch(() => undefined)
         break
       } catch {
         if (Date.now() > deadline) throw new Error('Syncthing did not start within 60s')
