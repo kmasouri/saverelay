@@ -25,7 +25,34 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: node scripts/fetch-syncthing.mjs win32 x64
-      - run: node scripts/brand-syncthing.mjs
+      # Task Manager and firewall prompts show a program's built-in description and icon.
+      # Label the bundled Syncthing as part of SaveRelay. Its MPL-2.0 license allows this;
+      # its LICENSE.txt and copyright string ship unchanged.
+      - name: Label Syncthing as SaveRelay Sync
+        shell: bash
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          import { rcedit } from 'rcedit'
+          // An .ico can hold a PNG as-is: a 6-byte header, one 16-byte entry, then the PNG.
+          const png = readFileSync('resources/icon.png')
+          const header = Buffer.alloc(22)
+          header.writeUInt16LE(1, 2) // type: icon
+          header.writeUInt16LE(1, 4) // one image
+          header.writeUInt16LE(1, 10) // colour planes
+          header.writeUInt16LE(32, 12) // bits per pixel
+          header.writeUInt32LE(png.length, 14)
+          header.writeUInt32LE(22, 18) // image data offset
+          writeFileSync('saverelay-sync.ico', Buffer.concat([header, png]))
+          await rcedit('resources/syncthing/win32-x64/syncthing.exe', {
+            icon: 'saverelay-sync.ico',
+            'version-string': {
+              FileDescription: 'SaveRelay Sync',
+              ProductName: 'SaveRelay Sync',
+              Comments: 'Syncthing, bundled with SaveRelay to move saves between friends',
+            },
+          })
+          EOF
       - run: npm run build
       - name: Package installer
         run: npx electron-builder --win --x64 --publish never
