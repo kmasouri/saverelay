@@ -58,7 +58,7 @@ button.ghost:hover:not(:disabled) { color: var(--text); background: var(--panel-
 button.danger { color: var(--bad); }
 button.link { background: none; border: none; padding: 0; color: var(--ember-2); }
 
-input[type='text'], input:not([type]), textarea, select {
+input[type='text'], input[type='number'], input:not([type]), textarea, select {
   font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
   border-radius: 8px; padding: 8px 10px; width: 100%;
 }

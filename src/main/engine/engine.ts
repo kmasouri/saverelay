@@ -49,7 +49,8 @@ interface WorldState {
 const HOUSEKEEPING_MS = 10 * 60_000
 /** Backups taken before a friend's save replaces yours, kept per save on this PC. */
 const BACKUPS_KEPT = 3
-export const KEEP_VERSION_CHOICES = [5, 10, 20, 50, 0]
+/** The most versions a group can ask to keep; 0 means keep every version. */
+export const MAX_KEEP_VERSIONS = 1000
 
 async function dirSize(dir: string): Promise<number> {
   let total = 0
@@ -840,7 +841,7 @@ export class Engine extends EventEmitter {
 
   /** Sets how many versions keep their files, for everyone sharing this save. 0 keeps all. */
   async setKeepVersions(worldId: string, keepVersions: number): Promise<void> {
-    if (!KEEP_VERSION_CHOICES.includes(keepVersions)) throw new Error('Unknown history limit')
+    if (!Number.isInteger(keepVersions) || keepVersions < 0 || keepVersions > MAX_KEEP_VERSIONS) throw new Error(`Keep between 1 and ${MAX_KEEP_VERSIONS} versions, or every version.`)
     this.world(worldId)
     const store = this.stores.get(worldId)!
     const current = currentPolicy((await store.loadEvents(this.keyMap())).events)

@@ -34,6 +34,23 @@
     await act(() => call('setPolicy', world.id, policy, preferred), 'Rule updated for everyone')
   }
 
+  const DEFAULT_KEEP = 20
+
+  async function setKeepCount(n: number): Promise<void> {
+    if (n === world.policy.keepVersions) return
+    await act(() => call('setKeepVersions', world.id, n), n ? `Keeping the last ${n} versions` : 'Keeping every version')
+  }
+
+  /** Saves a typed limit; anything that isn't a whole number from 1 to 1000 snaps back. */
+  function setKeep(input: HTMLInputElement): void {
+    const n = Number(input.value)
+    if (!Number.isInteger(n) || n < 1 || n > 1000) {
+      input.value = String(world.policy.keepVersions)
+      return
+    }
+    void setKeepCount(n)
+  }
+
   async function restore(n: GraphNode): Promise<void> {
     const ok = confirm(`Bring back the save from ${exact(n.savedAt)}?\n\nIt becomes the latest save for everyone. Nothing is deleted: the current save stays in history.`)
     if (ok) await act(() => call('restore', world.id, n.contentId), 'Done. Friends get it once their game is closed.')
@@ -100,14 +117,7 @@
 <section class="card stack">
   <div class="row spread">
     <h2>History</h2>
-    <label class="row small muted keep">
-      Keep the last
-      <select value={world.policy.keepVersions} onchange={(e) => act(() => call('setKeepVersions', world.id, Number(e.currentTarget.value)), 'History limit updated for everyone')}>
-        {#each [5, 10, 20, 50] as n}<option value={n}>{n}</option>{/each}
-        <option value={0}>all</option>
-      </select>
-      versions · applies to everyone
-    </label>
+    <span class="faint small">Newest at the top</span>
   </div>
   {#if !graph}
     <p class="muted small">Loading…</p>
@@ -126,17 +136,35 @@
 
 <section class="two">
   <div class="card stack">
-    <h2>When people play separately</h2>
-    <select value={world.policy.policy} onchange={(e) => setPolicy(e.currentTarget.value as Policy)}>
-      {#each Object.entries(POLICY_LABEL) as [value, label]}<option {value}>{label}</option>{/each}
-    </select>
-    {#if world.policy.policy === 'preferred-device'}
-      <select aria-label="Whose save wins" value={world.policy.preferredDeviceId} onchange={(e) => setPolicy('preferred-device', e.currentTarget.value)}>
-        <option value={ui.device.deviceId}>You</option>
-        {#each ui.peers as p}<option value={p.deviceId}>{p.name}</option>{/each}
-      </select>
-    {/if}
-    <p class="faint small">{world.policy.setBy ? `Applies to everyone. Set by ${world.policy.setBy}.` : 'Applies to everyone.'}</p>
+    <h2>Rules for everyone</h2>
+    <div class="rules">
+      <label for="rule-separate" class="muted">When people play separately</label>
+      <div class="stack tight">
+        <select id="rule-separate" value={world.policy.policy} onchange={(e) => setPolicy(e.currentTarget.value as Policy)}>
+          {#each Object.entries(POLICY_LABEL) as [value, label]}<option {value}>{label}</option>{/each}
+        </select>
+        {#if world.policy.policy === 'preferred-device'}
+          <select aria-label="Whose save wins" value={world.policy.preferredDeviceId} onchange={(e) => setPolicy('preferred-device', e.currentTarget.value)}>
+            <option value={ui.device.deviceId}>You</option>
+            {#each ui.peers as p}<option value={p.deviceId}>{p.name}</option>{/each}
+          </select>
+        {/if}
+      </div>
+      <label for="rule-keep" class="muted">History to keep</label>
+      <div class="stack tight">
+        {#if world.policy.keepVersions}
+          <div class="row keep">
+            <input id="rule-keep" type="number" min="1" max="1000" value={world.policy.keepVersions} onchange={(e) => setKeep(e.currentTarget)} />
+            <span class="muted">versions</span>
+          </div>
+        {/if}
+        <label class="check small">
+          <input type="checkbox" checked={!world.policy.keepVersions} onchange={(e) => setKeepCount(e.currentTarget.checked ? 0 : DEFAULT_KEEP)} />
+          Keep every version
+        </label>
+      </div>
+    </div>
+    <p class="faint small">{world.policy.setBy ? `Set by ${world.policy.setBy}. ` : ''}Changes apply to everyone sharing this save. Older versions past the limit are cleared to save space.</p>
   </div>
 
   <div class="card stack">
@@ -181,8 +209,10 @@
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .cands { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
   .more { align-self: flex-start; }
-  .keep { gap: 6px; }
-  .keep select { width: auto; padding: 4px 8px; }
+  .rules { display: grid; grid-template-columns: auto 1fr; gap: 12px 16px; align-items: start; }
+  .rules > label { padding-top: 8px; }
+  .keep { gap: 8px; }
+  .keep input { width: 90px; }
   .presence { gap: 6px; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
   .dot.on { background: var(--ok); }
