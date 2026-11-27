@@ -1,5 +1,5 @@
 <script lang="ts">
-  // The Relay Loop mark; same geometry as scripts/make-icons.mjs.
+  // The Relay Loop mark; same geometry as the app and tray icons.
   let { size = 26, spin = false }: { size?: number; spin?: boolean } = $props()
 </script>
 
