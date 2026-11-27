@@ -87,6 +87,7 @@ export interface AppState {
   transport: { ok: boolean; error: string | null }
   peers: { deviceId: string; name: string; connected: boolean; lastSeenAt: number; addedAt: number }[]
   pendingDevices: { deviceId: string; name: string; address: string }[]
+  friendRequests: { syncthingId: string; deviceId: string; name: string }[]
   invitations: { folderId: string; label: string; offeredBy: string[] }[]
   games: Game[]
   worlds: World[]

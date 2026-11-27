@@ -250,6 +250,8 @@ async function main(): Promise<void> {
     joinWorld: (folderId, input) => engine.joinWorld(str(folderId, 128), input as NewWorldInput),
     updateWorld: (id, patch) => engine.updateWorld(str(id, 64), patch as Partial<NewWorldInput>),
     removeWorld: (id) => engine.removeWorld(str(id, 64)),
+    acceptFriendRequest: (id) => engine.acceptFriendRequest(str(id, 80)),
+    ignoreFriendRequest: (id) => engine.ignoreFriendRequest(str(id, 80)),
     setKeepVersions: (id, n) => engine.setKeepVersions(str(id, 64), Number(n)),
     setPolicy: (id, policy, preferred) => engine.setPolicy(str(id, 64), str(policy, 32) as Policy, preferred === undefined ? undefined : str(preferred, 64)),
     chooseCandidate: (id, contentId) => engine.chooseCandidate(str(id, 64), str(contentId, 64)),

@@ -119,6 +119,8 @@ export class Engine extends EventEmitter {
   private ticking: Promise<void> | null = null
   private transportError: string | null = null
   private pendingDevices: { deviceId: string; name: string; address: string }[] = []
+  /** Connection attempts that carry a valid invite: someone added us and waits for us to accept. */
+  private friendRequests: { syncthingId: string; deviceId: string; name: string; code: string }[] = []
   private pendingFolders: { folderId: string; label: string; offeredBy: string[] }[] = []
   private connections: Record<string, boolean> = {}
   private lastSeen: Record<string, number> = {}
@@ -325,6 +327,7 @@ export class Engine extends EventEmitter {
     const st = this.deps.syncthing
     if (!st?.running) return
     try {
+      await st.setOwnName(this.invite())
       for (const p of this.cfg.peers) {
         if (p.removed) await st.removeDevice(p.syncthingId)
         else await st.ensureDevice(p.syncthingId, p.name)
@@ -374,7 +377,7 @@ export class Engine extends EventEmitter {
     try {
       this.connections = await st.connections()
       this.lastSeen = await st.lastSeen()
-      this.pendingDevices = (await st.pendingDevices()).filter((d) => !this.cfg.peers.some((p) => p.syncthingId === d.deviceId && !p.removed))
+      this.sortConnectionAttempts(await st.pendingDevices())
       const offers = await st.pendingFolders()
       this.pendingFolders = []
       for (const offer of offers) {
@@ -646,6 +649,41 @@ export class Engine extends EventEmitter {
     this.cfg.deviceName = trimmed
     this.cfg.nameChosen = true
     await this.persistConfig()
+    if (this.deps.syncthing?.running) await this.deps.syncthing.setOwnName(this.invite()).catch(() => undefined)
+  }
+
+  /**
+   * Splits unknown connection attempts into friend requests (they carry a
+   * matching invite) and others (older SaveRelay versions). Unfriended and
+   * ignored people stay quiet until this person adds them again.
+   */
+  private sortConnectionAttempts(pending: { deviceId: string; name: string; address: string }[]): void {
+    this.friendRequests = []
+    this.pendingDevices = []
+    for (const d of pending) {
+      const peer = this.cfg.peers.find((p) => p.syncthingId === d.deviceId)
+      if (peer || this.cfg.ignoredRequests?.includes(d.deviceId)) continue
+      const invite = decodeInvite(d.name)
+      // The invite must belong to the PC that's actually connecting, or anyone could pose as anyone.
+      if (invite && invite.syncthingId === d.deviceId && invite.deviceId !== this.cfg.identity.deviceId) {
+        this.friendRequests.push({ syncthingId: d.deviceId, deviceId: invite.deviceId, name: invite.name, code: d.name })
+      } else this.pendingDevices.push(d)
+    }
+  }
+
+  async acceptFriendRequest(syncthingId: string): Promise<string> {
+    const request = this.friendRequests.find((r) => r.syncthingId === syncthingId)
+    if (!request) throw new Error('That friend request is no longer pending.')
+    const name = await this.addPeer(request.code)
+    this.friendRequests = this.friendRequests.filter((r) => r.syncthingId !== syncthingId)
+    return name
+  }
+
+  async ignoreFriendRequest(syncthingId: string): Promise<void> {
+    this.cfg.ignoredRequests = [...new Set([...(this.cfg.ignoredRequests ?? []), syncthingId])]
+    this.friendRequests = this.friendRequests.filter((r) => r.syncthingId !== syncthingId)
+    await this.deps.syncthing?.dismissPendingDevice(syncthingId)
+    await this.persistConfig()
   }
 
   async setStartAtLogin(enabled: boolean): Promise<void> {
@@ -657,6 +695,8 @@ export class Engine extends EventEmitter {
     const invite = decodeInvite(code)
     if (!invite) throw new Error('That invite code is not valid.')
     if (invite.deviceId === this.cfg.identity.deviceId) throw new Error('That is this device’s own invite code.')
+    // Adding someone yourself always overrides an earlier ignore.
+    this.cfg.ignoredRequests = this.cfg.ignoredRequests?.filter((id) => id !== invite.syncthingId)
     const existing = this.cfg.peers.find((p) => p.deviceId === invite.deviceId)
     if (existing) {
       Object.assign(existing, { name: invite.name, syncthingId: invite.syncthingId, removed: false })
@@ -879,6 +919,7 @@ export class Engine extends EventEmitter {
           return { deviceId: p.deviceId, name: p.name, connected, lastSeenAt: connected ? this.now() : (this.lastSeen[p.syncthingId] ?? 0), addedAt: p.addedAt }
         }),
       pendingDevices: this.pendingDevices,
+      friendRequests: this.friendRequests.map(({ syncthingId, deviceId, name }) => ({ syncthingId, deviceId, name })),
       invitations: this.pendingFolders.map((f) => ({
         folderId: f.folderId,
         label: f.label,

@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { recoverJournal } from '../src/main/engine/applier'
+import { encodeInvite, newIdentity } from '../src/core/identity'
 import { Engine } from '../src/main/engine/engine'
 import { FOLDER_PREFIX, type Syncthing } from '../src/main/engine/syncthing'
 
@@ -19,6 +20,8 @@ interface FakeFolder {
 class FakeNet {
   folders = new Map<string, Map<string, FakeFolder>>()
   offline = new Set<string>()
+  /** Connection attempts each device's transport reports, keyed by that device's id. */
+  pending = new Map<string, { deviceId: string; name: string; address: string }[]>()
 
   syncthingFor(myId: string): Syncthing {
     const net = this
@@ -49,8 +52,10 @@ class FakeNet {
         return [...offers.values()]
       },
       async pendingDevices() {
-        return []
+        return net.pending.get(myId) ?? []
       },
+      async setOwnName() {},
+      async dismissPendingDevice() {},
       async connections() {
         return Object.fromEntries([...net.folders.keys()].map((id) => [id, !net.offline.has(id)]))
       },
@@ -347,3 +352,47 @@ describe('crash recovery', () => {
     expect(existsSync(journal)).toBe(false)
   })
 })
+
+describe('friend requests', () => {
+  const stranger = (name: string, syncthingId = stId('Z')): string => {
+    const id = newIdentity()
+    return encodeInvite({ v: 1, name, deviceId: id.deviceId, publicKey: id.publicKey, syncthingId })
+  }
+  const attempt = (to: Device, deviceId: string, name: string): void => void net.pending.set(stId(to === devices.a ? 'A' : 'B'), [{ deviceId, name, address: '' }])
+
+  it('turns a connection that carries a matching invite into a request, and accepting adds the friend', async () => {
+    attempt(devices.a, stId('Z'), stranger('DefectiveWombat'))
+    await rounds(1)
+    expect(devices.a.engine.snapshot().friendRequests.map((r) => r.name)).toEqual(['DefectiveWombat'])
+    expect(await devices.a.engine.acceptFriendRequest(stId('Z'))).toBe('DefectiveWombat')
+    expect(devices.a.engine.snapshot().peers.map((p) => p.name)).toContain('DefectiveWombat')
+    await rounds(1)
+    expect(devices.a.engine.snapshot().friendRequests).toEqual([])
+  })
+
+  it("doesn't trust an invite that belongs to a different PC than the one connecting", async () => {
+    attempt(devices.a, stId('Y'), stranger('Impostor', stId('Z')))
+    await rounds(1)
+    expect(devices.a.engine.snapshot().friendRequests).toEqual([])
+    expect(devices.a.engine.snapshot().pendingDevices.map((d) => d.deviceId)).toEqual([stId('Y')])
+  })
+
+  it('keeps ignored and unfriended people quiet until you add them again', async () => {
+    const code = stranger('Pest')
+    attempt(devices.a, stId('Z'), code)
+    await rounds(1)
+    await devices.a.engine.ignoreFriendRequest(stId('Z'))
+    await rounds(1)
+    expect(devices.a.engine.snapshot().friendRequests).toEqual([])
+    await devices.a.engine.addPeer(code)
+    expect(devices.a.engine.snapshot().peers.map((p) => p.name)).toContain('Pest')
+
+    const bob = devices.a.engine.config.peers.find((p) => p.name === 'Bob')!
+    await devices.a.engine.removePeer(bob.deviceId)
+    attempt(devices.a, bob.syncthingId, devices.b.engine.invite())
+    await rounds(1)
+    expect(devices.a.engine.snapshot().friendRequests).toEqual([])
+    expect(devices.a.engine.snapshot().pendingDevices).toEqual([])
+  })
+})
+

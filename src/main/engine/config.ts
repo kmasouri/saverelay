@@ -37,6 +37,8 @@ export interface AppConfig {
   identity: Identity
   syncthingApiKey: string
   peers: Peer[]
+  /** Transport ids of friend requests this person ignored; they stay hidden. */
+  ignoredRequests?: string[]
   worlds: WorldConfig[]
   startAtLogin: boolean
 }

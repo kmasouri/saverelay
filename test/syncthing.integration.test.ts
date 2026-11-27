@@ -114,6 +114,48 @@ describe.skipIf(!BIN)('real Syncthing transport', () => {
     expect(groups.map((g) => g.contributions[0].deviceName)).toEqual(['Bob', 'Alice'])
   })
 
+  it('turns a one-sided add into a friend request the other side accepts', { timeout: 300_000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'saverelay-st-'))
+    cleanup.push(() => rm(root, { recursive: true, force: true }))
+    const make = async (name: string) => {
+      const port = await freePort()
+      const st = new Syncthing({
+        binary: BIN!,
+        home: join(root, name, 'st'),
+        apiKey: `key-${name}-0123456789`,
+        log: (m) => logs.push(`${name} ${m}`),
+        options: { listenAddresses: [`tcp://127.0.0.1:${port}`], globalAnnounceEnabled: false, localAnnounceEnabled: false, relaysEnabled: false, natEnabled: false },
+      })
+      await st.start()
+      cleanup.push(() => st.stop())
+      const engine = await Engine.create({
+        dataDir: join(root, name, 'data'),
+        documentsDir: root,
+        syncthing: st,
+        detector: { running: async () => new Set<string>() },
+        notify: () => undefined,
+        log: (m) => logs.push(`${name} ENGINE ${m}`),
+      })
+      await engine.setDeviceName(name)
+      cleanup.push(() => engine.stop())
+      await engine.start(1000)
+      return { st, port, engine }
+    }
+    const a = await make('Alice')
+    const b = await make('Bob')
+    dump = async () => JSON.stringify({ aPeers: a.engine.snapshot().peers, bRequests: b.engine.snapshot().friendRequests, bPending: b.engine.snapshot().pendingDevices }, null, 1)
+
+    // Only Alice adds Bob. Her connection attempt carries her invite as its name.
+    await a.engine.addPeer(b.engine.invite())
+    await a.st.ensureDevice(b.st.myId, 'Bob', [`tcp://127.0.0.1:${b.port}`])
+    await until('Bob to get a friend request from Alice', async () => b.engine.snapshot().friendRequests.some((r) => r.name === 'Alice'))
+
+    await b.engine.acceptFriendRequest(a.st.myId)
+    await b.st.ensureDevice(a.st.myId, 'Alice', [`tcp://127.0.0.1:${a.port}`])
+    await until('Alice and Bob to connect', async () => a.engine.snapshot().peers[0]?.connected === true && b.engine.snapshot().peers[0]?.connected === true)
+    expect(b.engine.snapshot().peers.map((p) => p.name)).toEqual(['Alice'])
+  })
+
   it('takes over from a copy left running by a crashed app', { timeout: 120_000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'saverelay-st-'))
     cleanup.push(() => rm(root, { recursive: true, force: true }))

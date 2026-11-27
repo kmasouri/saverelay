@@ -47,7 +47,7 @@
 
   const selectedWorldId = $derived(route.kind === 'world' ? route.id : null)
   const currentWorld = $derived(selectedWorldId && ui ? ui.worlds.find((w) => w.id === selectedWorldId) : undefined)
-  const attention = $derived(ui ? ui.invitations.length + ui.pendingDevices.length : 0)
+  const attention = $derived(ui ? ui.invitations.length + ui.pendingDevices.length + ui.friendRequests.length : 0)
 </script>
 
 <div class="frame">
@@ -80,7 +80,7 @@
             <button class="nav" class:active={route.kind === 'friends'} onclick={() => go({ kind: 'friends' })}>
               <Icon name="group" />
               Friends
-              {#if ui.pendingDevices.length}<span class="count">{ui.pendingDevices.length}</span>{/if}
+              {#if ui.friendRequests.length + ui.pendingDevices.length}<span class="count">{ui.friendRequests.length + ui.pendingDevices.length}</span>{/if}
             </button>
             <button class="nav" class:active={route.kind === 'settings'} onclick={() => go({ kind: 'settings' })}>
               <Icon name="settings" />

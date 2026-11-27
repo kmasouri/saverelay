@@ -185,6 +185,19 @@ export class Syncthing {
     })
   }
 
+  /**
+   * Sets the name this PC announces when it connects. SaveRelay puts its invite
+   * code here, so a friend's PC can turn our connection attempt into a request.
+   */
+  async setOwnName(name: string): Promise<void> {
+    await this.patch(`/rest/config/devices/${encodeURIComponent(this.myId)}`, { name })
+  }
+
+  /** Forgets a device's connection attempt; a new attempt shows it again. */
+  async dismissPendingDevice(deviceId: string): Promise<void> {
+    await this.request('DELETE', `/rest/cluster/pending/devices?device=${encodeURIComponent(deviceId)}`).catch(() => undefined)
+  }
+
   async removeDevice(deviceId: string): Promise<void> {
     await this.request('DELETE', `/rest/config/devices/${encodeURIComponent(deviceId)}`).catch(() => undefined)
   }
