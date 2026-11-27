@@ -82,4 +82,4 @@ Windows installers are built by GitHub Actions (`.github/workflows/release.yml`)
 
 ## License
 
-Public domain, under [the Unlicense](LICENSE). Bundled third-party software keeps its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Public domain, under [the Unlicense](LICENSE). The Windows installer puts `LICENSES.html` next to `SaveRelay.exe` with licenses for SaveRelay and the software it bundles.

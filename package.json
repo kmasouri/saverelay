@@ -7,6 +7,9 @@
   "license": "Unlicense",
   "private": true,
   "type": "module",
+  "config": {
+    "syncthingVersion": "v2.1.7"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

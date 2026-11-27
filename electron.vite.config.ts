@@ -2,17 +2,19 @@ import { defineConfig } from 'electron-vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { resolve } from 'node:path'
 
+const license = { fileName: 'license-report.json' }
+
 export default defineConfig({
   main: {
-    build: { rollupOptions: { input: { index: resolve('src/main/index.ts') } } },
+    build: { license, rollupOptions: { input: { index: resolve('src/main/index.ts') } } },
   },
   preload: {
     // Sandboxed preloads must be CommonJS.
-    build: { rollupOptions: { input: { index: resolve('src/preload/index.ts') }, output: { format: 'cjs', entryFileNames: '[name].cjs' } } },
+    build: { license, rollupOptions: { input: { index: resolve('src/preload/index.ts') }, output: { format: 'cjs', entryFileNames: '[name].cjs' } } },
   },
   renderer: {
     root: resolve('src/renderer'),
-    build: { rollupOptions: { input: { index: resolve('src/renderer/index.html') } } },
+    build: { license, rollupOptions: { input: { index: resolve('src/renderer/index.html') } } },
     plugins: [svelte()],
   },
 })

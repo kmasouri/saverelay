@@ -6,14 +6,17 @@ directories:
   buildResources: build
 files:
   - out/**/*
+  - '!out/*/license-report.json'
   - package.json
+afterPack: ./scripts/package-licenses.mjs
 extraResources:
-  - from: resources/syncthing/${platform}-${arch}
-    to: syncthing
   - from: resources
     to: .
     filter: ["*.png"]
 win:
+  extraResources:
+    - from: resources/syncthing/win32-${arch}
+      to: syncthing
   target:
     - target: nsis
       arch: [x64]
@@ -27,9 +30,15 @@ nsis:
   deleteAppDataOnUninstall: false
   shortcutName: SaveRelay
 mac:
+  extraResources:
+    - from: resources/syncthing/darwin-${arch}
+      to: syncthing
   target: [dmg]
   category: public.app-category.games
 linux:
+  extraResources:
+    - from: resources/syncthing/linux-${arch}
+      to: syncthing
   target: [AppImage]
   category: Game
 publish:

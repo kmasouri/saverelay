@@ -3,12 +3,13 @@
 // Usage: node scripts/fetch-syncthing.mjs [platform] [arch]   (defaults to the host)
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync, readdirSync, copyFileSync, chmodSync, existsSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, readdirSync, copyFileSync, chmodSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import metadata from '../package.json' with { type: 'json' }
 
-const VERSION = 'v2.1.7'
+const VERSION = metadata.config.syncthingVersion
 const platform = process.argv[2] ?? process.platform
 const arch = process.argv[3] ?? process.arch
 
@@ -23,8 +24,12 @@ const sumsUrl = `https://github.com/syncthing/syncthing/releases/download/${VERS
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const outDir = join(root, 'resources', 'syncthing', `${platform}-${arch}`)
+const versionFile = `${outDir}.version`
 const exe = platform === 'win32' ? 'syncthing.exe' : 'syncthing'
-if (existsSync(join(outDir, exe))) {
+if (
+  existsSync(versionFile) && readFileSync(versionFile, 'utf8') === VERSION &&
+  existsSync(join(outDir, exe)) && existsSync(join(outDir, 'LICENSE.txt'))
+) {
   console.log(`Syncthing already present at ${outDir}`)
   process.exit(0)
 }
@@ -54,8 +59,9 @@ else execFileSync('tar', ['-xzf', archivePath, '-C', work])
 
 const extracted = join(work, readdirSync(work).find((n) => n === base) ?? base)
 mkdirSync(outDir, { recursive: true })
+copyFileSync(join(extracted, 'LICENSE.txt'), join(outDir, 'LICENSE.txt'))
 copyFileSync(join(extracted, exe), join(outDir, exe))
 if (platform !== 'win32') chmodSync(join(outDir, exe), 0o755)
-if (existsSync(join(extracted, 'LICENSE.txt'))) copyFileSync(join(extracted, 'LICENSE.txt'), join(outDir, 'LICENSE.txt'))
+writeFileSync(versionFile, VERSION)
 rmSync(work, { recursive: true, force: true })
 console.log(`Syncthing ${VERSION} -> ${outDir}`)

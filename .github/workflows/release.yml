@@ -26,8 +26,8 @@ jobs:
       - run: npm test
       - run: node scripts/fetch-syncthing.mjs win32 x64
       # Task Manager and firewall prompts show a program's built-in description and icon.
-      # Label the bundled Syncthing as part of SaveRelay. Its MPL-2.0 license allows this;
-      # its LICENSE.txt and copyright string ship unchanged.
+      # Label the bundled Syncthing as part of SaveRelay and preserve its copyright string.
+      # Packaging includes the upstream license text in LICENSES.html.
       - name: Label Syncthing as SaveRelay Sync
         shell: bash
         run: |
@@ -63,12 +63,27 @@ jobs:
           ls -la dist/win-unpacked/resources dist/win-unpacked/resources/syncthing
           test -f dist/win-unpacked/resources/syncthing/syncthing.exe
           test -f dist/win-unpacked/resources/tray.png
+          test -f dist/win-unpacked/LICENSES.html
+          test ! -e dist/win-unpacked/LICENSE.electron.txt
+          test ! -e dist/win-unpacked/LICENSES.chromium.html
+          test ! -e dist/win-unpacked/resources/syncthing/LICENSE.txt
+          grep -Fq 'Chromium credits and licenses' dist/win-unpacked/LICENSES.html
+          grep -Fq '@material-symbols/svg-400@' dist/win-unpacked/LICENSES.html
+          grep -Fq 'https://github.com/syncthing/syncthing/tree/' dist/win-unpacked/LICENSES.html
           cat dist/win-unpacked/resources/app-update.yml
 
-      - name: Smoke test the packaged app
+      - name: Install and smoke test SaveRelay
         shell: pwsh
         run: |
-          $exe = "dist/win-unpacked/SaveRelay.exe"
+          $installDir = Join-Path $env:RUNNER_TEMP "SaveRelay"
+          $installer = Get-Item "dist/SaveRelay-Setup-*.exe"
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList "/S /D=$installDir" -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Installer exited with code $($process.ExitCode)" }
+          $licenses = Join-Path $installDir "LICENSES.html"
+          if ((Get-FileHash $licenses).Hash -ne (Get-FileHash "dist/win-unpacked/LICENSES.html").Hash) {
+            throw "Installed license document does not match the packaged copy"
+          }
+          $exe = Join-Path $installDir "SaveRelay.exe"
           $log = Join-Path $env:APPDATA "SaveRelay/logs/main.log"
           function Wait-Log($pattern) {
             for ($i = 0; $i -lt 60; $i++) {
@@ -87,7 +102,7 @@ jobs:
           function Show-Log { if (Test-Path $log) { Get-Content $log | Select-Object -Last 40 } }
           function Fail($msg) { Show-Log; Get-Process -Name "SaveRelay","syncthing" -ErrorAction SilentlyContinue | Stop-Process -Force; throw $msg }
 
-          $desc = (Get-Item "dist/win-unpacked/resources/syncthing/syncthing.exe").VersionInfo.FileDescription
+          $desc = (Get-Item (Join-Path $installDir "resources/syncthing/syncthing.exe")).VersionInfo.FileDescription
           if ($desc -ne "SaveRelay Sync") { throw "Bundled Syncthing is labelled '$desc', expected 'SaveRelay Sync'" }
 
           # 1. Starts cleanly and quits leaving nothing running.
