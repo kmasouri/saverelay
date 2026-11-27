@@ -29,7 +29,6 @@ The file name is the game's id: lowercase words joined by dashes, like `anno-180
   },
   "include": ["*.sav"],
   "exclude": [],
-  "verified": true,
   "notes": "One folder per world.",
   "example": {
     "files": ["{savedgames}/Some Game/Worlds/My World/world.sav"],
@@ -46,7 +45,6 @@ The file name is the game's id: lowercase words joined by dashes, like `anno-180
 | `windows.exe` | Program names from Task Manager's Details tab. List every version, e.g. a DX12 build. |
 | `include` / `exclude` | Which files inside a save folder get synced. |
 | `stripPrefix` | Optional. Text to drop from folder names when shown, e.g. `MP-`. |
-| `verified` | `true` if you checked all of this against the real game. Leave `false` if you got it from a wiki and haven't played it. |
 | `example` | Optional, but please add it. Sample files, and the save names SaveRelay should find among them. The tests create these files and check. |
 
 **Placeholders** for `windows.saves`. These are the only places a path can start:

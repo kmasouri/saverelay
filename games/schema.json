@@ -4,7 +4,7 @@
   "description": "One game SaveRelay can find on its own. The file name (lowercase, dashes) is the game's id. See CONTRIBUTING.md.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "windows", "include", "verified"],
+  "required": ["name", "windows", "include"],
   "properties": {
     "$schema": { "type": "string" },
     "name": { "type": "string", "description": "The game's name as players know it.", "maxLength": 80 },
@@ -26,7 +26,6 @@
     "include": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "Files to sync, relative to the save folder." },
     "exclude": { "type": "array", "items": { "type": "string" }, "description": "Files never to sync, e.g. per-player settings." },
     "stripPrefix": { "type": "string", "description": "Removed from folder names when shown, e.g. MP-." },
-    "verified": { "type": "boolean", "description": "true once someone confirmed the paths and exe names against the real game." },
     "notes": { "type": "string" },
     "example": {
       "type": "object",

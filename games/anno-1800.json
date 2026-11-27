@@ -9,7 +9,6 @@
   "include": ["*.a7s"],
   "exclude": ["accountdata.a7s"],
   "stripPrefix": "MP-",
-  "verified": false,
   "notes": "Each folder under accounts/<Ubisoft account> is one game: a profile's autosaves, or an MP- multiplayer session. The exe names are unconfirmed.",
   "example": {
     "files": [

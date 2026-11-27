@@ -24,8 +24,6 @@ export interface GameDefinition {
   }
   /** Removed from folder names when showing them, e.g. `MP-`. */
   stripPrefix?: string
-  /** Someone confirmed the paths and exe names against the real game. */
-  verified: boolean
   notes: string
   /** Sample files and the save names discovery should find among them; checked by the tests. */
   example?: { files: string[]; finds: string[] }
@@ -34,7 +32,7 @@ export interface GameDefinition {
 export const CUSTOM_GAME_ID = 'custom'
 
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
-const FIELDS = new Set(['$schema', 'name', 'windows', 'include', 'exclude', 'stripPrefix', 'verified', 'notes', 'example'])
+const FIELDS = new Set(['$schema', 'name', 'windows', 'include', 'exclude', 'stripPrefix', 'notes', 'example'])
 const isStr = (v: unknown, max = 200): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= max
 const isStrList = (v: unknown, max = 200): v is string[] => Array.isArray(v) && v.length > 0 && v.every((x) => isStr(x, max))
 
@@ -80,7 +78,6 @@ export function checkGameFile(id: string, raw: unknown): string[] {
     if (!Array.isArray(v) || (key === 'include' && v.length === 0) || !v.every((x) => isStr(x, 200) && safeRelative(x))) problems.push(`"${key}" must list file patterns inside the save folder, like *.sav`)
   }
   if (g.stripPrefix !== undefined && !isStr(g.stripPrefix, 40)) problems.push('"stripPrefix" must be text')
-  if (typeof g.verified !== 'boolean') problems.push('"verified" must be true or false')
   if (g.notes !== undefined && !isStr(g.notes, 1000)) problems.push('"notes" must be text')
   const ex = g.example as Record<string, unknown> | undefined
   if (ex !== undefined) {
@@ -100,7 +97,6 @@ function toDefinition(id: string, g: Record<string, unknown>): GameDefinition {
     exclude: (g.exclude as string[] | undefined) ?? [],
     discovery: { saves: w.saves, contains: w.contains },
     stripPrefix: g.stripPrefix as string | undefined,
-    verified: g.verified as boolean,
     notes: (g.notes as string | undefined) ?? '',
     example: g.example as GameDefinition['example'],
   }

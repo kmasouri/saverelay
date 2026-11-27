@@ -47,7 +47,6 @@ describe('game file rules', () => {
     name: 'Some Game',
     windows: { saves: '{savedgames}/Some Game/*', contains: '*.sav', exe: ['SomeGame.exe'] },
     include: ['*.sav'],
-    verified: false,
   }
   const problems = (patch: Record<string, unknown>, id = 'some-game'): string[] => checkGameFile(id, { ...good, ...patch })
 
