@@ -112,7 +112,16 @@ async function main(): Promise<void> {
   } else {
     log(`Syncthing binary missing at ${syncthingBin}`)
   }
-  const engine = await Engine.create({ dataDir, documentsDir: app.getPath('documents'), syncthing, detector: systemProcessDetector, notify, log })
+  const home = app.getPath('home')
+  const localAppData = process.env.LOCALAPPDATA ?? join(home, 'AppData', 'Local')
+  const places = {
+    home,
+    savedgames: join(home, 'Saved Games'),
+    appdata: app.getPath('appData'),
+    localappdata: localAppData,
+    localappdatalow: join(dirname(localAppData), 'LocalLow'),
+  }
+  const engine = await Engine.create({ dataDir, documentsDir: app.getPath('documents'), places, syncthing, detector: systemProcessDetector, notify, log })
   shutdown.add({ name: 'engine', run: () => engine.stop(), timeoutMs: 10_000 })
 
   const updater = new Updater(log)

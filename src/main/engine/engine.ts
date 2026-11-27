@@ -9,8 +9,8 @@
 import { randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import { lstat, readFile, readdir, realpath, rm, stat } from 'node:fs/promises'
-import { basename, join, resolve as resolvePath } from 'node:path'
-import { GAMES, gameById } from '../../core/games'
+import { join, resolve as resolvePath } from 'node:path'
+import { GAMES, gameById, type Placeholder } from '../../core/games'
 import { buildGraph, filesToClear, type Graph } from '../../core/graph'
 import { buildHistory, type ContentGroup } from '../../core/history'
 import { decodeInvite, encodeInvite, signEvent } from '../../core/identity'
@@ -19,6 +19,7 @@ import { globToRegExp } from '../../core/paths'
 import { DEFAULT_KEEP_VERSIONS, currentPolicy, resolve, type Candidate, type Resolution } from '../../core/reconcile'
 import { SCHEMA, compareEvents, isVersion, type FileEntry, type Policy, type SyncEvent } from '../../core/types'
 import { applySnapshot, recoverJournal } from './applier'
+import { findSaves, type FoundSave } from './discovery'
 import { loadConfig, saveConfig, type AppConfig, type WorldConfig } from './config'
 import { isGameRunning, type ProcessDetector } from './process'
 import { scanFolder, type Scan } from './scanner'
@@ -88,6 +89,8 @@ interface Runtime {
 export interface EngineDeps {
   dataDir: string
   documentsDir: string
+  /** Where each games/ placeholder points on this PC; {documents} defaults to documentsDir. */
+  places?: Partial<Record<Placeholder, string>>
   syncthing: Syncthing | null
   detector: ProcessDetector
   notify: (title: string, body: string) => void
@@ -851,39 +854,11 @@ export class Engine extends EventEmitter {
     return { groups, decisions, graph: buildGraph(events) }
   }
 
-  async discover(): Promise<{ gameId: string; gameName: string; name: string; path: string; added: boolean; lastPlayedAt: number }[]> {
-    const out: { gameId: string; gameName: string; name: string; path: string; added: boolean; lastPlayedAt: number }[] = []
-    for (const game of GAMES) {
-      const d = game.discovery
-      if (!d || d.platform !== process.platform) continue
-      const base = d.base.replace('{documents}', this.deps.documentsDir)
-      let level = [base]
-      for (let i = 0; i < d.depth; i++) {
-        const next: string[] = []
-        for (const dir of level) {
-          const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
-          for (const e of entries) if (e.isDirectory()) next.push(join(dir, e.name))
-        }
-        level = next
-      }
-      const want = globToRegExp(d.mustContain)
-      for (const dir of level) {
-        const files = await readdir(dir).catch(() => [] as string[])
-        const saves = files.filter((f) => want.test(f))
-        if (!saves.length) continue
-        const times = await Promise.all(saves.map((f) => stat(join(dir, f)).then((s) => s.mtimeMs, () => 0)))
-        const added = this.cfg.worlds.some((w) => resolvePath(w.localPath).toLowerCase() === resolvePath(dir).toLowerCase())
-        out.push({
-          gameId: game.id,
-          gameName: game.name,
-          name: basename(dir).replace(/^MP-/, ''),
-          path: dir,
-          added,
-          lastPlayedAt: Math.max(...times),
-        })
-      }
-    }
-    return out.sort((a, b) => b.lastPlayedAt - a.lastPlayedAt)
+  async discover(): Promise<(FoundSave & { added: boolean })[]> {
+    const found = await findSaves(GAMES, { documents: this.deps.documentsDir, ...this.deps.places })
+    return found
+      .map((f) => ({ ...f, added: this.cfg.worlds.some((w) => resolvePath(w.localPath).toLowerCase() === resolvePath(f.path).toLowerCase()) }))
+      .sort((a, b) => b.lastPlayedAt - a.lastPlayedAt)
   }
 
   snapshot() {

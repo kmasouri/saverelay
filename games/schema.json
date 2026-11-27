@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SaveRelay game",
+  "description": "One game SaveRelay can find on its own. The file name (lowercase, dashes) is the game's id. See CONTRIBUTING.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "windows", "include", "verified"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "type": "string", "description": "The game's name as players know it.", "maxLength": 80 },
+    "windows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["saves", "contains", "exe"],
+      "properties": {
+        "saves": {
+          "type": "string",
+          "description": "Where save folders are. Starts with {documents}, {savedgames}, {appdata}, {localappdata}, {localappdatalow} or {home}; * matches one folder level.",
+          "pattern": "^\\{(documents|savedgames|appdata|localappdata|localappdatalow|home)\\}(/[^/\\\\:]+)*$",
+          "examples": ["{documents}/Anno 1800/accounts/*/*", "{localappdatalow}/IronGate/Valheim/worlds_local"]
+        },
+        "contains": { "type": "string", "description": "A save folder directly contains at least one file matching this, e.g. *.sav." },
+        "exe": { "type": "array", "items": { "type": "string", "pattern": "\\.exe$" }, "minItems": 1, "description": "Program names shown in Task Manager's Details tab while the game runs." }
+      }
+    },
+    "include": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "Files to sync, relative to the save folder." },
+    "exclude": { "type": "array", "items": { "type": "string" }, "description": "Files never to sync, e.g. per-player settings." },
+    "stripPrefix": { "type": "string", "description": "Removed from folder names when shown, e.g. MP-." },
+    "verified": { "type": "boolean", "description": "true once someone confirmed the paths and exe names against the real game." },
+    "notes": { "type": "string" },
+    "example": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "finds"],
+      "description": "Sample files and the save names SaveRelay should find among them. The tests create them and check.",
+      "properties": {
+        "files": { "type": "array", "items": { "type": "string" } },
+        "finds": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

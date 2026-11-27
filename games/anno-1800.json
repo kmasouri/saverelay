@@ -1,0 +1,23 @@
+{
+  "$schema": "./schema.json",
+  "name": "Anno 1800",
+  "windows": {
+    "saves": "{documents}/Anno 1800/accounts/*/*",
+    "contains": "*.a7s",
+    "exe": ["Anno1800.exe", "Anno1800_plus.exe"]
+  },
+  "include": ["*.a7s"],
+  "exclude": ["accountdata.a7s"],
+  "stripPrefix": "MP-",
+  "verified": false,
+  "notes": "Each folder under accounts/<Ubisoft account> is one game: a profile's autosaves, or an MP- multiplayer session. The exe names are unconfirmed.",
+  "example": {
+    "files": [
+      "{documents}/Anno 1800/accounts/2fce55db/Cristofano Maggi/Autosave 0.a7s",
+      "{documents}/Anno 1800/accounts/2fce55db/MP-The Betrayers-20AB/Autosave 3.a7s",
+      "{documents}/Anno 1800/accounts/2fce55db/accountdata.a7s",
+      "{documents}/Anno 1800/accounts/2fce55db/Empty Profile/settings.txt"
+    ],
+    "finds": ["Cristofano Maggi", "The Betrayers-20AB"]
+  }
+}

@@ -4,7 +4,7 @@
   "version": "0.1.8",
   "description": "Automatic game save sharing between trusted friends",
   "author": "Kayvan Masouri",
-  "license": "UNLICENSED",
+  "license": "Unlicense",
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",

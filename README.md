@@ -26,7 +26,7 @@ git push --follow-tags   # Release workflow: build, smoke test, publish the upda
 ## Using it
 
 1. **Friends:** each person copies their invite code (Friends page) and pastes everyone else's. Trust is explicit and pairwise.
-2. **Share a world:** pick a detected Anno 1800 world, or browse to any save folder. Confirm the exact folder and tick the friends who get it.
+2. **Share a save:** the Saves page lists saves found for every game in [`games/`](games), or pick any save folder with **Other game…**. Click **Share** and tick the friends who get it.
 3. **Join:** friends see an invitation, choose their *own* local save folder, and join. Their existing saves are backed up first.
 4. **Play normally.** While the game runs, nothing touches its save folder. After it exits and the files settle, changed saves are published. Incoming saves apply when the game is closed.
 
@@ -37,6 +37,10 @@ Conflicts (two people continued independently) follow the group's policy:
 - **Preferred device**
 
 Nothing is ever merged or deleted. Every version stays in **History** with its contributors and can be restored.
+
+## Adding a game
+
+Each game SaveRelay can find on its own is one JSON file in [`games/`](games): where it saves, which files, and its `.exe`. No code needed. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## How it works
 
@@ -75,3 +79,7 @@ Windows installers are built by GitHub Actions (`.github/workflows/release.yml`)
 - **Delivery:** updates are peer-to-peer only. A friend who holds the update must be online at the same time as you.
 - **Revocation:** removing a friend stops future sharing. Files they already received can't be recalled.
 - **Platforms:** only Windows builds are produced for now. macOS and Linux targets are configured but unvalidated.
+
+## License
+
+Public domain, under [the Unlicense](LICENSE). Bundled third-party software keeps its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
