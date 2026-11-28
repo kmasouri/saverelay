@@ -1,5 +1,6 @@
 <script lang="ts">
   import { bytes, call, downloadLine, uploadingLine, when, type AppState, type Discovered, type World } from '../lib/api'
+  import { move, slideY } from '../lib/motion'
   import StatusBadge from '../lib/StatusBadge.svelte'
   import AddWorld from './AddWorld.svelte'
 
@@ -70,9 +71,9 @@
 </header>
 
 {#if ui.invitations.length}
-  <section class="stack">
+  <section class="stack" transition:slideY>
     {#each ui.invitations as inv (inv.folderId)}
-      <div class="card alert row spread">
+      <div class="card alert row spread" transition:slideY>
         <div class="stack tight">
           <strong>{inv.label}</strong>
           <span class="muted small">Shared with you by {inv.offeredBy.join(', ')}</span>
@@ -96,15 +97,16 @@
 
 {#each groups as g, i (g.gameId)}
   {@const open = isOpen(g, i)}
-  <section class="group">
+  <section class="group" animate:move>
     <button class="group-head" aria-expanded={open} onclick={() => (toggled[g.gameId] = !open)}>
       <span class="chev" class:open aria-hidden="true">›</span>
       <strong class="grow">{g.gameName}</strong>
       <span class="faint small">{g.rows.length} {g.rows.length === 1 ? 'save' : 'saves'}{g.shared ? ` · ${g.shared} shared` : ''}</span>
     </button>
     {#if open}
+      <div transition:slideY>
       {#each g.rows as r (r.key)}
-        <div class="save row">
+        <div class="save row" animate:move transition:slideY>
           {#if r.world}
             {@const w = r.world}
             <button class="open grow" title={w.localPath} onclick={() => go({ kind: 'world', id: w.id })}>
@@ -121,6 +123,7 @@
           {/if}
         </div>
       {/each}
+      </div>
     {/if}
   </section>
 {:else}
@@ -158,6 +161,9 @@
   .open:hover strong { color: var(--ember-2); }
   .other { display: flex; gap: 10px; align-items: center; text-align: left; padding: 14px 16px; border-style: dashed; background: none; }
   .other:hover:not(:disabled) { border-color: var(--ember); background: none; }
+  /* Wide buttons barely shrink when pressed, or the whole row lurches. */
+  .group-head:active:not(:disabled), .other:active:not(:disabled) { transform: scale(0.995); }
+  .open:active:not(:disabled) { transform: none; }
   dialog { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 24px; width: min(640px, 90vw); }
   dialog::backdrop { background: #000a; }
 </style>

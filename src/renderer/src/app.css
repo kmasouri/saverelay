@@ -47,8 +47,9 @@ code, .mono { font-family: 'Cascadia Mono', Consolas, ui-monospace, monospace; f
 
 button {
   font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
-  border-radius: 8px; padding: 7px 14px; cursor: pointer; transition: background 0.12s, border-color 0.12s;
+  border-radius: 8px; padding: 7px 14px; cursor: pointer; transition: background 0.12s, border-color 0.12s, transform 0.08s;
 }
+button:active:not(:disabled) { transform: scale(0.97); }
 button:hover:not(:disabled) { border-color: var(--faint); background: #33293a; }
 button:disabled { opacity: 0.5; cursor: default; }
 button.primary { background: linear-gradient(180deg, var(--ember), #f0612a); border-color: transparent; color: #1b0f08; font-weight: 600; }
@@ -57,6 +58,17 @@ button.ghost { background: transparent; border-color: transparent; color: var(--
 button.ghost:hover:not(:disabled) { color: var(--text); background: var(--panel-2); }
 button.danger { color: var(--bad); }
 button.link { background: none; border: none; padding: 0; color: var(--ember-2); }
+button.link:active { transform: none; }
+
+/* A clicked button waits for its action: no second click, and a spinner if it takes a moment. */
+button[data-pending] { pointer-events: none; }
+button[data-busy] { position: relative; color: transparent !important; }
+button[data-busy]::after {
+  content: ''; position: absolute; inset: 0; margin: auto; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--text); border-right-color: transparent; animation: spin 0.7s linear infinite;
+}
+button.primary[data-busy]::after { border-color: #1b0f08; border-right-color: transparent; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 input[type='text'], input[type='number'], input:not([type]), textarea, select {
   font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
@@ -70,7 +82,7 @@ label.field > span { color: var(--muted); font-size: 12px; }
 label.check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
 input[type='checkbox'], input[type='radio'] { accent-color: var(--ember); width: 16px; height: 16px; }
 
-.badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--panel-2); color: var(--muted); white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--panel-2); color: var(--muted); white-space: nowrap; transition: color 0.25s, background-color 0.25s; }
 .badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .badge.plain::before { display: none; }
 .badge.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
@@ -84,3 +96,13 @@ hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; width: 100%
 
 ::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; border: 2px solid var(--bg); }
+
+dialog[open] { animation: pop 0.16s ease-out; }
+dialog[open]::backdrop { animation: fade-in 0.16s ease-out; }
+@keyframes pop { from { opacity: 0; transform: scale(0.97); } }
+@keyframes fade-in { from { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, ::backdrop { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  button[data-busy]::after { animation: none; }
+}

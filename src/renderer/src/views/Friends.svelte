@@ -1,5 +1,6 @@
 <script lang="ts">
   import { call, when, type AppState } from '../lib/api'
+  import { move, slideY } from '../lib/motion'
 
   type Act = <T>(fn: () => Promise<T>, success?: string) => Promise<T | undefined>
   let { ui, act }: { ui: AppState; act: Act } = $props()
@@ -68,10 +69,10 @@
 </section>
 
 {#if ui.friendRequests.length}
-  <section class="stack">
+  <section class="stack" transition:slideY>
     <h2>Friend requests</h2>
     {#each ui.friendRequests as r (r.syncthingId)}
-      <div class="card alert row spread">
+      <div class="card alert row spread" transition:slideY>
         <span><strong>{r.name}</strong> wants to be friends</span>
         <div class="row">
           <button class="primary" onclick={() => act(() => call<string>('acceptFriendRequest', r.syncthingId), `${r.name} is now your friend`)}>Accept</button>
@@ -83,7 +84,7 @@
 {/if}
 
 {#if ui.pendingDevices.length}
-  <section class="card alert stack">
+  <section class="card alert stack" transition:slideY>
     <h2>Someone is trying to connect</h2>
     <p class="muted small">They’re on an older version of SaveRelay, so this can’t be a request yet. If you recognize them, ask for their invite code and paste it above. Otherwise ignore this.</p>
     {#each ui.pendingDevices as d (d.deviceId)}
@@ -98,7 +99,7 @@
     <div class="card muted">No friends yet.</div>
   {/if}
   {#each ui.peers as p (p.deviceId)}
-    <div class="card row spread">
+    <div class="card row spread" animate:move transition:slideY>
       <div class="row">
         <span class="badge {p.connected ? 'ok' : ''}">{p.connected ? 'online' : 'offline'}</span>
         <strong>{p.name}</strong>

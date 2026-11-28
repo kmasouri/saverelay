@@ -3,6 +3,7 @@
   import { call, type AppState } from './lib/api'
   import Icon from './lib/Icon.svelte'
   import Logo from './lib/Logo.svelte'
+  import { fadeIn, rise } from './lib/motion'
   import Overview from './views/Overview.svelte'
   import WorldDetail from './views/WorldDetail.svelte'
   import AddWorld from './views/AddWorld.svelte'
@@ -24,8 +25,21 @@
     toastTimer = setTimeout(() => (toast = null), tone === 'bad' ? 7000 : 3500)
   }
 
+  /** The button whose click started this action, if a click started it. Effects aren't clicks, even mid-click. */
+  function clickedButton(): HTMLButtonElement | null {
+    const ev = window.event
+    if (!ev || $effect.tracking()) return null
+    if (ev instanceof SubmitEvent) return ev.submitter instanceof HTMLButtonElement ? ev.submitter : null
+    return ev.type === 'click' && ev.target instanceof Element ? ev.target.closest('button') : null
+  }
+
   /** Runs a user action, surfacing failures instead of swallowing them. */
   async function act<T>(fn: () => Promise<T>, success?: string): Promise<T | undefined> {
+    const btn = clickedButton()
+    if (btn?.hasAttribute('data-pending')) return undefined
+    btn?.setAttribute('data-pending', '')
+    // Only show the spinner when the action is slow enough to notice.
+    const spin = btn && setTimeout(() => btn.setAttribute('data-busy', ''), 150)
     try {
       const result = await fn()
       if (success) notify(success)
@@ -33,6 +47,10 @@
     } catch (err) {
       notify(err instanceof Error ? err.message : String(err), 'bad')
       return undefined
+    } finally {
+      clearTimeout(spin ?? undefined)
+      btn?.removeAttribute('data-pending')
+      btn?.removeAttribute('data-busy')
     }
   }
 
@@ -45,6 +63,7 @@
     return window.sr.onState((s) => (ui = s))
   })
 
+  const view = $derived(route.kind === 'world' ? `world:${route.id}` : route.kind === 'add' ? `add:${route.folderId ?? ''}` : route.kind)
   const selectedWorldId = $derived(route.kind === 'world' ? route.id : null)
   const currentWorld = $derived(selectedWorldId && ui ? ui.worlds.find((w) => w.id === selectedWorldId) : undefined)
   const attention = $derived(ui ? ui.invitations.length + ui.pendingDevices.length + ui.friendRequests.length : 0)
@@ -124,25 +143,25 @@
             </div>
           {/if}
 
-          {#if route.kind === 'overview'}
-            <Overview {ui} {act} {go} {attention} />
-          {:else if route.kind === 'world'}
-            {#if currentWorld}
-              {#key currentWorld.id}
-                <WorldDetail world={currentWorld} {ui} {act} {go} />
-              {/key}
-            {:else}
-              <p class="muted">This save is no longer shared.</p>
-            {/if}
-          {:else if route.kind === 'add'}
-            {#key route.folderId}
-              <AddWorld {ui} {act} {go} folderId={route.folderId} />
-            {/key}
-          {:else if route.kind === 'friends'}
-            <Friends {ui} {act} />
-          {:else if route.kind === 'settings'}
-            <Settings {ui} {act} />
-          {/if}
+          {#key view}
+            <div class="view" in:fadeIn>
+              {#if route.kind === 'overview'}
+                <Overview {ui} {act} {go} {attention} />
+              {:else if route.kind === 'world'}
+                {#if currentWorld}
+                  <WorldDetail world={currentWorld} {ui} {act} {go} />
+                {:else}
+                  <p class="muted">This save is no longer shared.</p>
+                {/if}
+              {:else if route.kind === 'add'}
+                <AddWorld {ui} {act} {go} folderId={route.folderId} />
+              {:else if route.kind === 'friends'}
+                <Friends {ui} {act} />
+              {:else if route.kind === 'settings'}
+                <Settings {ui} {act} />
+              {/if}
+            </div>
+          {/key}
         </main>
       </div>
     {/if}
@@ -150,7 +169,7 @@
 </div>
 
 {#if toast}
-  <div class="toast {toast.tone}" role="status">{toast.text}</div>
+  <div class="toast {toast.tone}" role="status" transition:rise>{toast.text}</div>
 {/if}
 
 <style>
@@ -171,6 +190,7 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
   .dot.on { background: var(--ok); }
   main { overflow-y: auto; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .view { display: flex; flex-direction: column; gap: 16px; }
   .banner { display: flex; gap: 8px; flex-wrap: wrap; }
   .welcome { width: min(440px, 90vw); margin: 15vh auto 0; padding: 28px; align-items: flex-start; }
   .welcome input { width: 100%; }
