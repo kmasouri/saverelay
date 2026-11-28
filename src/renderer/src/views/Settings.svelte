@@ -33,7 +33,7 @@
         {#if u.status === 'disabled'}Updates are off in development builds.
         {:else if u.status === 'checking'}Checking for updates…
         {:else if u.status === 'downloading'}Downloading {u.version} in the background… {u.progress ?? 0}%
-        {:else if u.status === 'ready'}Version {u.version} is ready. It installs when SaveRelay restarts.
+        {:else if u.status === 'ready'}Version {u.version} is ready. It installs {ui.device.autoUpdate ? 'once you’re not playing and nobody is downloading from you' : 'when SaveRelay restarts'}.
         {:else if u.status === 'up-to-date'}You're up to date (checked {when(u.checkedAt ?? 0)}).
         {:else if u.status === 'error'}Update check failed: {u.error}
         {:else}Updates download automatically in the background.{/if}
@@ -45,6 +45,10 @@
       <button disabled={u.status === 'disabled' || u.status === 'checking' || u.status === 'downloading'} onclick={() => act(() => call('checkForUpdates'))}>Check now</button>
     {/if}
   </div>
+  <label class="check">
+    <input type="checkbox" checked={ui.device.autoUpdate} onchange={(e) => act(() => call('setAutoUpdate', e.currentTarget.checked))} />
+    Install updates automatically. SaveRelay restarts into a new version when you're not playing and no friend is downloading from you. When off, updates install the next time SaveRelay restarts.
+  </label>
 </section>
 
 <section class="card stack">

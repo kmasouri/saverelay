@@ -16,11 +16,25 @@ export interface UpdateState {
 }
 
 const CHECK_EVERY_MS = 4 * 60 * 60 * 1000
+/** How often a downloaded update looks for a quiet moment to install itself. */
+const AUTO_INSTALL_EVERY_MS = 60_000
+
+export interface AutoInstall {
+  /** The person chose automatic updates. */
+  enabled: () => boolean
+  /** Restarting now interrupts nothing. */
+  safe: () => boolean
+  /** Called right before restarting into the update. */
+  before: () => void
+}
 
 export class Updater extends EventEmitter {
   state: UpdateState = { status: app.isPackaged ? 'idle' : 'disabled' }
 
-  constructor(log: (msg: string) => void) {
+  constructor(
+    log: (msg: string) => void,
+    private readonly auto: AutoInstall,
+  ) {
     super()
     if (!app.isPackaged) return
     autoUpdater.autoDownload = true
@@ -32,7 +46,8 @@ export class Updater extends EventEmitter {
     autoUpdater.on('download-progress', (p) => this.set({ ...this.state, status: 'downloading', progress: Math.round(p.percent) }))
     autoUpdater.on('update-downloaded', (info) => {
       this.set({ status: 'ready', version: info.version, checkedAt: Date.now() })
-      new Notification({ title: 'SaveRelay update ready', body: `Version ${info.version} installs the next time SaveRelay restarts.` }).show()
+      const body = this.auto.enabled() ? `Version ${info.version} installs once you're not playing and nobody is downloading from you.` : `Version ${info.version} installs the next time SaveRelay restarts.`
+      new Notification({ title: 'SaveRelay update ready', body }).show()
     })
     autoUpdater.on('error', (err) => this.set({ status: 'error', error: err?.message ?? String(err), checkedAt: Date.now() }))
   }
@@ -46,6 +61,14 @@ export class Updater extends EventEmitter {
     if (!app.isPackaged) return
     setTimeout(() => void this.check(), 15_000)
     setInterval(() => void this.check(), CHECK_EVERY_MS)
+    setInterval(() => this.maybeAutoInstall(), AUTO_INSTALL_EVERY_MS)
+  }
+
+  /** With automatic updates on, a downloaded update installs at the first quiet moment. */
+  private maybeAutoInstall(): void {
+    if (this.state.status !== 'ready' || !this.auto.enabled() || !this.auto.safe()) return
+    this.auto.before()
+    this.installNow()
   }
 
   async check(): Promise<void> {

@@ -346,6 +346,20 @@ describe('three friends sharing one world', () => {
     expect(devices.a.engine.uploadingTo()).toEqual({ names: [], percent: null })
   })
 
+  it('is only safe to restart for an update when nothing would be interrupted', async () => {
+    await rounds()
+    expect(devices.a.engine.safeToRestart()).toBe(true)
+    devices.a.running.add('anno1800.exe')
+    await rounds(1)
+    expect(devices.a.engine.safeToRestart()).toBe(false)
+    devices.a.running.clear()
+    await rounds()
+    expect(devices.a.engine.safeToRestart()).toBe(true)
+    net.need.set(stId('B'), 100)
+    await rounds(1)
+    expect(devices.a.engine.safeToRestart()).toBe(false)
+  })
+
   it('a stale device coming back does not roll back shared progress', async () => {
     net.offline.add(stId('C'))
     await writeSave(devices.a, 'world.a7s', 'v1', 2_000)

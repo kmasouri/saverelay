@@ -41,6 +41,8 @@ export interface AppConfig {
   ignoredRequests?: string[]
   worlds: WorldConfig[]
   startAtLogin: boolean
+  /** Restart into downloaded updates on its own when nothing is going on. Off unless chosen. */
+  autoUpdate?: boolean
 }
 
 export async function loadConfig(path: string): Promise<AppConfig> {

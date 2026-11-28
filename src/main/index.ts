@@ -127,8 +127,18 @@ async function main(): Promise<void> {
   const engine = await Engine.create({ dataDir, documentsDir: app.getPath('documents'), places, syncthing, detector: systemProcessDetector, notify, log, clockOffset: () => measureClockOffset() })
   shutdown.add({ name: 'engine', run: () => engine.stop(), timeoutMs: 10_000 })
 
-  const updater = new Updater(log)
-  const startHidden = process.argv.includes('--hidden')
+  // An automatic update restarts SaveRelay; it comes back in the tray, the way it was.
+  const restartHiddenMarker = join(dataDir, 'restart-hidden')
+  const updater = new Updater(log, {
+    enabled: () => !!engine.config.autoUpdate,
+    safe: () => engine.safeToRestart(),
+    before: () => {
+      if (!win?.isVisible()) writeFileSync(restartHiddenMarker, '')
+      log('[updater] installing automatically')
+    },
+  })
+  const startHidden = process.argv.includes('--hidden') || existsSync(restartHiddenMarker)
+  rmSync(restartHiddenMarker, { force: true })
 
   app.setLoginItemSettings({ openAtLogin: engine.config.startAtLogin, args: ['--hidden'] })
 
@@ -287,6 +297,7 @@ async function main(): Promise<void> {
       await engine.setStartAtLogin(enabled === true)
       app.setLoginItemSettings({ openAtLogin: enabled === true, args: ['--hidden'] })
     },
+    setAutoUpdate: (enabled) => engine.setAutoUpdate(enabled === true),
     addPeer: (code) => engine.addPeer(str(code, 2048)),
     removePeer: (id) => engine.removePeer(str(id, 64)),
     addWorld: (input) => engine.addWorld(input as NewWorldInput),

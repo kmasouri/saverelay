@@ -785,6 +785,17 @@ export class Engine extends EventEmitter {
     await this.persistConfig()
   }
 
+  async setAutoUpdate(enabled: boolean): Promise<void> {
+    this.cfg.autoUpdate = enabled
+    await this.persistConfig()
+  }
+
+  /** Nothing would be interrupted by a restart: no game open or settling, no save being applied, nobody downloading from us. */
+  safeToRestart(): boolean {
+    const busy = this.cfg.worlds.some((w) => this.states.get(w.id)?.playing || ['playing', 'pending-update'].includes(this.runtimes.get(w.id)?.status ?? ''))
+    return !busy && this.uploadingTo().names.length === 0
+  }
+
   async addPeer(code: string): Promise<string> {
     const invite = decodeInvite(code)
     if (!invite) throw new Error('That invite code is not valid.')
@@ -1007,6 +1018,7 @@ export class Engine extends EventEmitter {
         syncthingId: this.deps.syncthing?.myId ?? '',
         invite: this.deps.syncthing?.myId ? this.invite() : '',
         startAtLogin: this.cfg.startAtLogin,
+        autoUpdate: !!this.cfg.autoUpdate,
       },
       transport: { ok: !this.transportError, error: this.transportError },
       /** Set when this PC's clock is far enough off to warn about. */
