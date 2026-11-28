@@ -214,14 +214,19 @@ export class Syncthing {
       fsWatcherDelayS: 2,
       rescanIntervalS: 60,
       ignorePerms: true,
+      // Events are tiny and say what's new; pull them before save blobs so friends see new versions and choices right away.
+      order: 'smallestFirst',
       // History lives in our store; the transport never deletes shared content on its own.
       ignoreDelete: true,
     })
   }
 
-  /** Asks for an immediate rescan so new events don't wait on the filesystem watcher. */
-  async scan(worldId: string): Promise<void> {
-    await this.request('POST', `/rest/db/scan?folder=${encodeURIComponent(FOLDER_PREFIX + worldId)}`)
+  /**
+   * Asks for an immediate rescan so new events don't wait on the filesystem watcher.
+   * Syncthing answers only once the scan is done, so `sub` keeps it to a quick subfolder.
+   */
+  async scan(worldId: string, sub?: string): Promise<void> {
+    await this.request('POST', `/rest/db/scan?folder=${encodeURIComponent(FOLDER_PREFIX + worldId)}${sub ? `&sub=${encodeURIComponent(sub)}` : ''}`)
   }
 
   async removeFolder(worldId: string): Promise<void> {

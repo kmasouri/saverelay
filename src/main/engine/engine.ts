@@ -357,8 +357,11 @@ export class Engine extends EventEmitter {
         continue
       }
       try {
-        await st.scan(worldId)
+        // Events first and waited on: they're small and tell friends what's new. Hashing
+        // new save blobs can take longer than a request may wait, so that scan runs on its own.
+        await st.scan(worldId, 'events')
         this.dirty.delete(worldId)
+        void st.scan(worldId).catch((err) => this.deps.log(`transport rescan failed: ${String(err)}`))
       } catch (err) {
         this.deps.log(`transport rescan failed: ${String(err)}`)
       }
