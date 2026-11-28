@@ -143,6 +143,8 @@ export class Engine extends EventEmitter {
   private lastSeen: Record<string, number> = {}
   private housekeptAt = new Map<string, number>()
   private storage = new Map<string, number>()
+  /** Per world, friends still downloading from this PC: bytes they need, and the most they needed this time. */
+  private uploads = new Map<string, Map<string, { needBytes: number; peakBytes: number }>>()
   /** The last check of this PC's clock against real time. */
   private clock: { offsetMs: number; checkedAt: number } | null = null
   /** Worlds whose staging store changed locally since the transport last scanned it. */
@@ -287,6 +289,7 @@ export class Engine extends EventEmitter {
       if (JSON.stringify(this.states.get(w.id)) !== before) await this.persistState(w.id)
     }
     await this.flushToTransport()
+    await this.pollUploads()
     await this.housekeeping()
     this.emit('change')
   }
@@ -386,6 +389,37 @@ export class Engine extends EventEmitter {
         this.deps.log(`transport rescan failed: ${String(err)}`)
       }
     }
+  }
+
+  /** Which online friends still need part of each world, so this PC isn't closed under them. */
+  private async pollUploads(): Promise<void> {
+    const st = this.deps.syncthing
+    for (const w of this.cfg.worlds) {
+      const prev = this.uploads.get(w.id) ?? new Map()
+      const next = new Map<string, { needBytes: number; peakBytes: number }>()
+      for (const p of this.cfg.peers) {
+        if (p.removed || !w.sharedWith.includes(p.deviceId) || !this.connections[p.syncthingId] || !st?.running) continue
+        const needBytes = await st.needBytes(w.id, p.syncthingId).catch(() => 0)
+        if (needBytes > 0) next.set(p.deviceId, { needBytes, peakBytes: Math.max(needBytes, prev.get(p.deviceId)?.peakBytes ?? 0) })
+      }
+      this.uploads.set(w.id, next)
+    }
+  }
+
+  /** Friends still downloading a save from this PC, by world. */
+  private uploading(worldId: string): { deviceId: string; name: string; percent: number }[] {
+    return [...(this.uploads.get(worldId) ?? new Map()).entries()].map(([deviceId, u]) => ({
+      deviceId,
+      name: this.cfg.peers.find((p) => p.deviceId === deviceId)?.name ?? 'A friend',
+      percent: Math.floor(((u.peakBytes - u.needBytes) / u.peakBytes) * 100),
+    }))
+  }
+
+  /** Everyone still downloading from this PC, across all worlds, for the tray and quit warnings. */
+  uploadingTo(): { names: string[]; percent: number | null } {
+    const all = this.cfg.worlds.flatMap((w) => this.uploading(w.id))
+    const names = [...new Set(all.map((u) => u.name))]
+    return { names, percent: all.length === 1 ? all[0].percent : null }
   }
 
   private async pollTransport(): Promise<void> {
@@ -879,6 +913,7 @@ export class Engine extends EventEmitter {
     this.cfg.worlds = this.cfg.worlds.filter((w) => w.id !== worldId)
     this.states.delete(worldId)
     this.runtimes.delete(worldId)
+    this.uploads.delete(worldId)
     this.stores.delete(worldId)
     await this.persistConfig()
   }
@@ -1012,6 +1047,7 @@ export class Engine extends EventEmitter {
             : null,
           conflict: res?.state === 'conflict' ? candidates : null,
           autoNote: res?.state === 'auto-resolved' || res?.state === 'conflict' ? (res.note ?? null) : null,
+          uploading: this.uploading(w.id).map(({ name, percent }) => ({ name, percent })),
           overruled: rt?.overruled ? { decisionId: rt.overruled.decision.id, at: rt.overruled.decision.at, byName: rt.overruled.by.deviceName } : null,
           acceptedContentId: res && 'accepted' in res ? res.accepted.contentId : null,
           liveContentId: st?.liveContentId ?? null,

@@ -19,6 +19,8 @@ interface FakeFolder {
 class FakeNet {
   folders = new Map<string, Map<string, FakeFolder>>()
   offline = new Set<string>()
+  /** Bytes each device still needs, as every other device's transport reports it. */
+  need = new Map<string, number>()
   /** Connection attempts each device's transport reports, keyed by that device's id. */
   pending = new Map<string, { deviceId: string; name: string; address: string }[]>()
 
@@ -31,6 +33,9 @@ class FakeNet {
       async ensureDevice() {},
       async removeDevice() {},
       async scan() {},
+      async needBytes(_worldId: string, deviceId: string) {
+        return net.need.get(deviceId) ?? 0
+      },
       async ensureFolder(worldId: string, label: string, path: string, devices: string[]) {
         net.folders.get(myId)!.set(FOLDER_PREFIX + worldId, { path, devices, label })
       },
@@ -321,6 +326,24 @@ describe('three friends sharing one world', () => {
     await rounds()
     for (const d of Object.values(devices)) expect(await readSave(d)).toBe('cara-real-newest')
     expect(notes.some((n) => n.startsWith('Bob:') && n.includes('60 minutes ahead'))).toBe(true)
+  })
+
+  it('shows who is still downloading from this PC, with progress, only while they are online', async () => {
+    net.need.set(stId('B'), 1000)
+    await rounds(1)
+    expect(world(devices.a).uploading).toEqual([{ name: 'Bob', percent: 0 }])
+    net.need.set(stId('B'), 400)
+    net.need.set(stId('C'), 50)
+    await rounds(1)
+    expect(world(devices.a).uploading).toEqual([
+      { name: 'Bob', percent: 60 },
+      { name: 'Cara', percent: 0 },
+    ])
+    expect(devices.a.engine.uploadingTo()).toEqual({ names: ['Bob', 'Cara'], percent: null })
+    net.offline.add(stId('C'))
+    net.need.delete(stId('B'))
+    await rounds(1)
+    expect(devices.a.engine.uploadingTo()).toEqual({ names: [], percent: null })
   })
 
   it('a stale device coming back does not roll back shared progress', async () => {

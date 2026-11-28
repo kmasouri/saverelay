@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, shell, Tray, type IpcMainInvokeEvent } from 'electron'
+import { app, BaseWindow, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, shell, Tray, type IpcMainInvokeEvent } from 'electron'
 import { existsSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { uptime } from 'node:os'
 import { writeFile } from 'node:fs/promises'
@@ -12,6 +12,7 @@ import { createShutdown } from './lifecycle'
 import { createLogger } from './logger'
 import { Updater } from './updater'
 import { measureClockOffset } from './clock'
+import { joinNames, uploadingLine } from '../core/names'
 import type { Policy } from '../core/types'
 
 const APP_ID = 'com.kmasouri.saverelay'
@@ -187,10 +188,50 @@ async function main(): Promise<void> {
   // `SaveRelay.exe --quit` asks the running copy to shut down cleanly.
   app.on('second-instance', (_e, argv) => (argv.includes('--quit') ? app.quit() : showWindow()))
 
+  // ---- friends still downloading from this PC --------------------------------
+
+  const uploadWarning = (): string | null => {
+    const u = engine.uploadingTo()
+    return u.names.length ? uploadingLine(u.names, u.percent) : null
+  }
+
+  /** Quitting from the tray asks first while a friend still needs a save only this PC may have. */
+  async function confirmQuit(): Promise<void> {
+    const { names } = engine.uploadingTo()
+    if (names.length) {
+      const { response } = await dialog.showMessageBox({
+        type: 'warning',
+        title: 'SaveRelay',
+        message: `${joinNames(names)} ${names.length === 1 ? 'hasn’t' : 'haven’t'} received your save yet.`,
+        detail: 'If you quit, they can’t continue from your save until you’re back online.',
+        buttons: ['Keep SaveRelay open', 'Quit anyway'],
+        defaultId: 0,
+        cancelId: 0,
+      })
+      if (response !== 1) return
+    }
+    app.quit()
+  }
+
+  // Windows asks every top-level window before shutting down. SaveRelay often has no window
+  // open (it lives in the tray), so an invisible one stays around to answer.
+  if (process.platform === 'win32') {
+    const guard = new BaseWindow({ show: false, skipTaskbar: true, width: 1, height: 1 })
+    guard.on('query-session-end', (e) => {
+      const warning = uploadWarning()
+      if (!warning) return
+      e.preventDefault()
+      log(`held up shutdown: ${warning}`)
+      notify('Wait before shutting down', `${warning}. Cancel the shutdown and give them a minute, or they can’t continue until you’re back online.`)
+    })
+  }
+
   const trayImage = nativeImage.createFromPath(join(resources, 'tray.png'))
   const tray = new Tray(trayImage)
   tray.setToolTip('SaveRelay')
   const buildTrayMenu = (): void => {
+    const warning = uploadWarning()
+    tray.setToolTip(warning ? `SaveRelay\n${warning}. Keep SaveRelay open.` : 'SaveRelay')
     const snap = engine.snapshot()
     const worldItems = snap.worlds.map((w) => ({ label: `${w.name}: ${w.status.replace(/-/g, ' ')}`, enabled: false }))
     tray.setContextMenu(
@@ -202,7 +243,7 @@ async function main(): Promise<void> {
         updater.state.status === 'ready'
           ? { label: `Restart to update (${updater.state.version})`, click: () => updater.installNow() }
           : { label: 'Check for updates', enabled: app.isPackaged, click: () => void updater.check() },
-        { label: 'Quit', click: () => app.quit() },
+        { label: 'Quit', click: () => void confirmQuit() },
       ]),
     )
   }

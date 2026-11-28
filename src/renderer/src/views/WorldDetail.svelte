@@ -96,6 +96,16 @@
   <div class="card alert small">{w}</div>
 {/each}
 
+{#if world.uploading.length}
+  <section class="card alert stack tight">
+    <h2>{world.uploading.length === 1 ? `${world.uploading[0].name} is` : 'Friends are'} still downloading your save. Keep SaveRelay open.</h2>
+    <p class="muted">If this PC goes offline first, they can't continue from your save until you're back.</p>
+    {#each world.uploading as u (u.name)}
+      <div class="row spread small"><span>{u.name}</span><span class="muted">{u.percent}%</span></div>
+    {/each}
+  </section>
+{/if}
+
 {#if world.overruled}
   {@const o = world.overruled}
   <section class="card alert row spread">

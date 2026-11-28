@@ -11,5 +11,6 @@
     "noEmit": true,
     "composite": true
   },
-  "include": ["src/renderer/src/**/*"]
+  // core/names.ts is plain wording shared with the main process; nothing else in core is meant for the page.
+  "include": ["src/renderer/src/**/*", "src/core/names.ts"]
 }

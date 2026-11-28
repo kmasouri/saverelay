@@ -255,6 +255,12 @@ export class Syncthing {
     return Object.fromEntries(Object.entries(raw ?? {}).map(([id, s]) => [id, Math.max(0, Date.parse(s.lastSeen ?? '') || 0)]))
   }
 
+  /** Bytes of this world a device still needs, as far as this PC knows. */
+  async needBytes(worldId: string, deviceId: string): Promise<number> {
+    const raw = await this.get<{ needBytes?: number }>(`/rest/db/completion?folder=${encodeURIComponent(FOLDER_PREFIX + worldId)}&device=${encodeURIComponent(deviceId)}`)
+    return Math.max(0, raw?.needBytes ?? 0)
+  }
+
   async connections(): Promise<Record<string, boolean>> {
     const raw = await this.get<{ connections: Record<string, { connected: boolean }> }>('/rest/system/connections')
     return Object.fromEntries(Object.entries(raw.connections ?? {}).map(([id, c]) => [id, c.connected]))

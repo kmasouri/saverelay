@@ -1,5 +1,7 @@
 // Renderer-side view of the main process state. Mirrors Engine.snapshot().
 
+export { uploadingLine } from '../../../core/names'
+
 export type WorldStatus = 'setting-up' | 'up-to-date' | 'playing' | 'waiting-for-peer' | 'pending-update' | 'conflict' | 'error'
 export type Policy = 'ask' | 'latest-modified' | 'preferred-device'
 
@@ -39,6 +41,8 @@ export interface World {
   download: Download | null
   conflict: Candidate[] | null
   autoNote: string | null
+  /** Online friends still downloading a save from this PC, with how far along they are. */
+  uploading: { name: string; percent: number }[]
   /** This PC's choice that lost to a friend's made at about the same time, until dismissed. */
   overruled: { decisionId: string; at: number; byName: string } | null
   acceptedContentId: string | null
