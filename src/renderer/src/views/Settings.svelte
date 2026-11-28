@@ -47,8 +47,9 @@
   </div>
   <label class="check">
     <input type="checkbox" checked={ui.device.autoUpdate} onchange={(e) => act(() => call('setAutoUpdate', e.currentTarget.checked))} />
-    Install updates automatically. SaveRelay restarts into a new version when you're not playing and no friend is downloading from you. When off, updates install the next time SaveRelay restarts.
+    Install updates automatically
   </label>
+  <p class="faint small">Only restarts when you're not playing.</p>
 </section>
 
 <section class="card stack">
