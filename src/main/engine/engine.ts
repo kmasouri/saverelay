@@ -47,6 +47,16 @@ interface WorldState {
   lastCaptureAt: number
 }
 
+/** A clock further off than this gets a warning. */
+const CLOCK_WARN_MS = 2 * 60_000
+
+/** "7 minutes ahead", "3 hours behind" for a clock offset (positive = behind). */
+export function describeClockOffset(offsetMs: number): string {
+  const mins = Math.round(Math.abs(offsetMs) / 60_000)
+  const amount = mins < 120 ? `${mins} minute${mins === 1 ? '' : 's'}` : mins < 2 * 1440 ? `${Math.round(mins / 60)} hours` : `${Math.round(mins / 1440)} days`
+  return `${amount} ${offsetMs > 0 ? 'behind' : 'ahead'}`
+}
+
 /** How often each save's old versions and backups are cleared and its size recounted. */
 const HOUSEKEEPING_MS = 10 * 60_000
 /** Backups taken before a friend's save replaces yours, kept per save on this PC. */
@@ -101,6 +111,8 @@ export interface EngineDeps {
   notify: (title: string, body: string) => void
   log: (msg: string) => void
   now?: () => number
+  /** Milliseconds this PC's clock is behind real time, or null when it can't be checked. */
+  clockOffset?: () => Promise<number | null>
   settleMs?: number
   stableMs?: number
 }
@@ -131,6 +143,8 @@ export class Engine extends EventEmitter {
   private lastSeen: Record<string, number> = {}
   private housekeptAt = new Map<string, number>()
   private storage = new Map<string, number>()
+  /** The last check of this PC's clock against real time. */
+  private clock: { offsetMs: number; checkedAt: number } | null = null
   /** Worlds whose staging store changed locally since the transport last scanned it. */
   private dirty = new Set<string>()
   private readonly now: () => number
@@ -236,6 +250,7 @@ export class Engine extends EventEmitter {
 
   async start(intervalMs = 3000): Promise<void> {
     await this.syncTransportConfig()
+    void this.checkClock()
     const loop = async (): Promise<void> => {
       await this.tick()
       this.timer = setTimeout(loop, intervalMs)
@@ -516,6 +531,16 @@ export class Engine extends EventEmitter {
     }
   }
 
+  /** Measures this PC's clock against real time; null when it can't be checked right now. */
+  private async checkClock(): Promise<number | null> {
+    const offsetMs = (await this.deps.clockOffset?.().catch(() => null)) ?? null
+    if (offsetMs !== null) {
+      this.clock = { offsetMs, checkedAt: this.now() }
+      this.emit('change')
+    }
+    return offsetMs
+  }
+
   private async capture(w: WorldConfig, st: WorldState, store: WorldStore, scan: Scan): Promise<boolean> {
     const files: FileEntry[] = []
     for (const f of scan.files) {
@@ -531,12 +556,18 @@ export class Engine extends EventEmitter {
     if (contentId !== st.liveContentId) {
       const publish = files.length > 0 && (st.initialized || w.mode === 'contribute')
       if (publish) {
+        // Checked now, not earlier: what counts is the clock the saves were just written with.
+        const clockOffsetMs = await this.checkClock()
+        if (clockOffsetMs !== null && Math.abs(clockOffsetMs) > CLOCK_WARN_MS) {
+          this.deps.notify(w.name, `Your PC's clock is ${describeClockOffset(clockOffsetMs)}. This save's time was corrected, but fix the clock in Windows: Settings › Time & language › Date & time › Sync now.`)
+        }
         const ev = await this.emitEvent(store, {
           kind: 'capture',
           contentId,
           files,
           parents: st.basis,
           reason: st.initialized ? 'local' : 'import',
+          ...(clockOffsetMs !== null ? { clockOffsetMs } : {}),
         })
         st.basis = [ev.id]
         st.initialized = true
@@ -904,7 +935,7 @@ export class Engine extends EventEmitter {
     if (!source) throw new Error('Unknown version')
     const res = resolve(events)
     const parents = res.state === 'conflict' ? res.headIds : 'accepted' in res ? res.accepted.versionIds : []
-    await this.emitEvent(store, { kind: 'restore', contentId, files: source.files, parents, restoredFrom: source.id })
+    await this.emitEvent(store, { kind: 'restore', contentId, files: source.files, parents, restoredFrom: source.id, clockOffsetMs: source.clockOffsetMs })
     void this.tick()
   }
 
@@ -943,6 +974,8 @@ export class Engine extends EventEmitter {
         startAtLogin: this.cfg.startAtLogin,
       },
       transport: { ok: !this.transportError, error: this.transportError },
+      /** Set when this PC's clock is far enough off to warn about. */
+      clockWarning: this.clock && Math.abs(this.clock.offsetMs) > CLOCK_WARN_MS ? describeClockOffset(this.clock.offsetMs) : null,
       peers: this.cfg.peers
         .filter((p) => !p.removed)
         .map((p) => {
@@ -978,7 +1011,7 @@ export class Engine extends EventEmitter {
               }
             : null,
           conflict: res?.state === 'conflict' ? candidates : null,
-          autoNote: res?.state === 'auto-resolved' ? res.note : null,
+          autoNote: res?.state === 'auto-resolved' || res?.state === 'conflict' ? (res.note ?? null) : null,
           overruled: rt?.overruled ? { decisionId: rt.overruled.decision.id, at: rt.overruled.decision.at, byName: rt.overruled.by.deviceName } : null,
           acceptedContentId: res && 'accepted' in res ? res.accepted.contentId : null,
           liveContentId: st?.liveContentId ?? null,

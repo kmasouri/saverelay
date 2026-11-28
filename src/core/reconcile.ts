@@ -8,7 +8,10 @@ export interface Candidate {
   contentId: string
   versionIds: string[]
   files: FileEntry[]
+  /** Newest file save time, corrected to real time when the saving PC's clock was checked. */
   modifiedAt: number
+  /** The saving PC's clock was checked, so modifiedAt can be compared with other PCs'. */
+  timeVerified: boolean
   deviceIds: string[]
   deviceNames: string[]
 }
@@ -29,7 +32,7 @@ export type Resolution =
   | { state: 'empty'; policy: PolicySetting }
   | { state: 'ok'; accepted: Candidate; candidates: Candidate[]; policy: PolicySetting }
   | { state: 'auto-resolved'; accepted: Candidate; candidates: Candidate[]; headIds: string[]; policy: PolicySetting; note: string }
-  | { state: 'conflict'; candidates: Candidate[]; headIds: string[]; policy: PolicySetting }
+  | { state: 'conflict'; candidates: Candidate[]; headIds: string[]; policy: PolicySetting; note?: string }
 
 export function currentPolicy(events: SyncEvent[]): PolicySetting {
   const latest = events.filter((e): e is PolicyEvent => e.kind === 'policy').sort(compareEvents).at(-1)
@@ -148,8 +151,14 @@ function groupCandidates(headEvents: VersionEvent[]): Candidate[] {
   for (const v of [...headEvents].sort(compareEvents)) {
     let c = byContent.get(v.contentId)
     if (!c) {
-      c = { contentId: v.contentId, versionIds: [], files: v.files, modifiedAt: snapshotModifiedAt(v.files), deviceIds: [], deviceNames: [] }
+      c = { contentId: v.contentId, versionIds: [], files: v.files, modifiedAt: snapshotModifiedAt(v.files), timeVerified: false, deviceIds: [], deviceNames: [] }
       byContent.set(v.contentId, c)
+    }
+    // Same content saved on several PCs: take the times from the first whose clock was checked.
+    if (!c.timeVerified && v.clockOffsetMs !== undefined) {
+      c.files = v.files
+      c.modifiedAt = snapshotModifiedAt(v.files) + v.clockOffsetMs
+      c.timeVerified = true
     }
     c.versionIds.push(v.id)
     if (!c.deviceIds.includes(v.deviceId)) {
@@ -169,7 +178,11 @@ export function resolve(events: SyncEvent[]): Resolution {
 
   const headIds = headEvents.map((h) => h.id).sort()
   if (policy.policy === 'latest-modified') {
-    // Candidates are already ordered by original modification time, contentId as a stable tie-break.
+    // A PC whose clock wasn't checked could claim any time, so it never wins automatically.
+    if (candidates.some((c) => !c.timeVerified)) {
+      return { state: 'conflict', candidates, headIds, policy, note: 'Newest save wins only picks when every PC’s clock was checked. One of these was saved offline or by an older SaveRelay.' }
+    }
+    // Candidates are already ordered by corrected modification time, contentId as a stable tie-break.
     const tie = candidates[0].modifiedAt === candidates[1].modifiedAt
     return {
       state: 'auto-resolved',

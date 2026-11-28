@@ -11,6 +11,8 @@ const POLICIES: Policy[] = ['ask', 'latest-modified', 'preferred-device']
 
 const isStr = (v: unknown, max = 256): v is string => typeof v === 'string' && v.length > 0 && v.length <= max
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0
+/** Up to a year either way; a clock further off than that is a broken clock, not an offset. */
+const isOffset = (v: unknown): boolean => v === undefined || (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 366 * 86_400_000)
 const isIds = (v: unknown): v is string[] => Array.isArray(v) && v.length <= 1000 && v.every((x) => isStr(x) && ID.test(x))
 
 function validFiles(worldId: string, files: unknown, contentId: unknown): files is FileEntry[] {
@@ -40,10 +42,10 @@ export function parseEvent(raw: unknown, worldId: string, authorDir: string): Si
   if (!isStr(e.id) || !ID.test(e.id) || !isStr(e.deviceName, 64) || !isNum(e.at) || !isStr(e.sig, 200)) return null
   switch (e.kind) {
     case 'capture':
-      if (!isIds(e.parents) || (e.reason !== 'local' && e.reason !== 'import')) return null
+      if (!isIds(e.parents) || (e.reason !== 'local' && e.reason !== 'import') || !isOffset(e.clockOffsetMs)) return null
       return validFiles(worldId, e.files, e.contentId) ? (e as unknown as SignedEvent) : null
     case 'restore':
-      if (!isIds(e.parents) || !isStr(e.restoredFrom) || !ID.test(e.restoredFrom)) return null
+      if (!isIds(e.parents) || !isStr(e.restoredFrom) || !ID.test(e.restoredFrom) || !isOffset(e.clockOffsetMs)) return null
       return validFiles(worldId, e.files, e.contentId) ? (e as unknown as SignedEvent) : null
     case 'applied':
       return isStr(e.contentId) && HEX64.test(e.contentId) && isIds(e.versionIds) ? (e as unknown as SignedEvent) : null

@@ -11,6 +11,7 @@ import { Syncthing } from './engine/syncthing'
 import { createShutdown } from './lifecycle'
 import { createLogger } from './logger'
 import { Updater } from './updater'
+import { measureClockOffset } from './clock'
 import type { Policy } from '../core/types'
 
 const APP_ID = 'com.kmasouri.saverelay'
@@ -122,7 +123,7 @@ async function main(): Promise<void> {
     localappdata: localAppData,
     localappdatalow: join(dirname(localAppData), 'LocalLow'),
   }
-  const engine = await Engine.create({ dataDir, documentsDir: app.getPath('documents'), places, syncthing, detector: systemProcessDetector, notify, log })
+  const engine = await Engine.create({ dataDir, documentsDir: app.getPath('documents'), places, syncthing, detector: systemProcessDetector, notify, log, clockOffset: () => measureClockOffset() })
   shutdown.add({ name: 'engine', run: () => engine.stop(), timeoutMs: 10_000 })
 
   const updater = new Updater(log)

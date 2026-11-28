@@ -87,6 +87,8 @@ export interface UpdateState {
 export interface AppState {
   device: { name: string; nameChosen: boolean; deviceId: string; syncthingId: string; invite: string; startAtLogin: boolean }
   transport: { ok: boolean; error: string | null }
+  /** How far off this PC's clock is ("7 minutes ahead"), when it's enough to warn about. */
+  clockWarning: string | null
   peers: { deviceId: string; name: string; connected: boolean; lastSeenAt: number; addedAt: number }[]
   pendingDevices: { deviceId: string; name: string; address: string }[]
   friendRequests: { syncthingId: string; deviceId: string; name: string }[]

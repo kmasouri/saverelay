@@ -111,6 +111,12 @@
               </div>
             </div>
           {/if}
+          {#if ui.clockWarning}
+            <div class="card alert banner">
+              <strong>Your PC's clock is {ui.clockWarning}.</strong>
+              <span class="muted">SaveRelay corrects for it, but fix it in Windows: Settings › Time &amp; language › Date &amp; time › Sync now.</span>
+            </div>
+          {/if}
           {#if !ui.transport.ok}
             <div class="card danger banner">
               <strong>Sync transport problem.</strong>

@@ -108,6 +108,8 @@ let root: string
 let net: FakeNet
 let clock: number
 let devices: Record<'a' | 'b' | 'c', Device>
+/** How far each device's clock is behind real time; null = can't check. */
+const clockOffsets: Record<string, number | null> = {}
 const notes: string[] = []
 
 async function makeDevice(name: string, letter: string): Promise<Device> {
@@ -123,6 +125,7 @@ async function makeDevice(name: string, letter: string): Promise<Device> {
     notify: (t, b) => notes.push(`${name}: ${t}: ${b}`),
     log: () => {},
     now: () => clock,
+    clockOffset: async () => clockOffsets[letter.toLowerCase()] ?? 0,
     settleMs: 1000,
     stableMs: 1000,
   })
@@ -152,6 +155,7 @@ beforeEach(async () => {
   net = new FakeNet()
   clock = 1_700_000_000_000
   notes.length = 0
+  for (const k of Object.keys(clockOffsets)) delete clockOffsets[k]
   devices = { a: await makeDevice('Alice', 'A'), b: await makeDevice('Bob', 'B'), c: await makeDevice('Cara', 'C') }
   // Explicit pairwise trust: everyone pastes everyone else's invite.
   for (const x of Object.values(devices)) for (const y of Object.values(devices)) if (x !== y) await x.engine.addPeer(y.engine.invite())
@@ -298,6 +302,25 @@ describe('three friends sharing one world', () => {
     await devices.a.engine.setPolicy(world(devices.a).id, 'ask')
     await rounds()
     for (const d of Object.values(devices)) expect(world(d).status).toBe('up-to-date')
+  })
+
+  it('latest-modified sees through a clock set ahead, and warns its owner', async () => {
+    await devices.b.engine.setPolicy(world(devices.b).id, 'latest-modified')
+    await rounds()
+    net.offline.add(stId('B'))
+    await writeSave(devices.c, 'world.a7s', 'cara-real-newest', 9_000)
+    await rounds()
+    net.offline.clear()
+    net.offline.add(stId('C'))
+    // Bob's clock is an hour ahead, so his older save carries a later time.
+    clockOffsets.b = -3_600_000
+    await writeSave(devices.b, 'world.a7s', 'bob-clock-ahead', 3_600_000 + 8_000)
+    await rounds()
+    clockOffsets.b = 0
+    net.offline.clear()
+    await rounds()
+    for (const d of Object.values(devices)) expect(await readSave(d)).toBe('cara-real-newest')
+    expect(notes.some((n) => n.startsWith('Bob:') && n.includes('60 minutes ahead'))).toBe(true)
   })
 
   it('a stale device coming back does not roll back shared progress', async () => {

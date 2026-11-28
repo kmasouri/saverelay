@@ -112,6 +112,9 @@
     <div class="stack tight">
       <h2>People played separately. Pick which save everyone continues from.</h2>
       <p class="muted">Nothing is deleted. The others stay in history and can be brought back later.</p>
+      {#if world.autoNote}
+        <p class="muted small">{world.autoNote}</p>
+      {/if}
     </div>
     <div class="cands">
       {#each world.conflict as c (c.contentId)}

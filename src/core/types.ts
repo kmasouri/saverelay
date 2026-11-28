@@ -31,6 +31,8 @@ export interface CaptureEvent extends EventBase {
   /** Version event ids the device was playing from when this was captured. */
   parents: string[]
   reason: 'local' | 'import'
+  /** Milliseconds this device's clock was behind real time at capture; absent when it couldn't check. */
+  clockOffsetMs?: number
 }
 
 /** A user intentionally re-activated historical content. Original attribution stays on the source. */
@@ -40,6 +42,8 @@ export interface RestoreEvent extends EventBase {
   files: FileEntry[]
   parents: string[]
   restoredFrom: string
+  /** The restored capture's clock offset, so its file times stay comparable. */
+  clockOffsetMs?: number
 }
 
 /** A device applied content to its live folder. Changes availability, never contribution. */
