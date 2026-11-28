@@ -69,6 +69,7 @@ async function main(): Promise<void> {
   shutdown.add({ name: 'crash marker', run: () => rmSync(runningMarker, { force: true }), timeoutMs: 1_000 })
 
   const resources = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
+  const appIcon = join(resources, 'app-icon.png')
   const exe = process.platform === 'win32' ? 'syncthing.exe' : 'syncthing'
   const syncthingBin = app.isPackaged ? join(resources, 'syncthing', exe) : join(resources, 'syncthing', `${process.platform}-${process.arch}`, exe)
 
@@ -76,7 +77,7 @@ async function main(): Promise<void> {
 
   const notify = (title: string, body: string): void => {
     if (Notification.isSupported()) {
-      const n = new Notification({ title, body, icon: join(resources, 'icon.png') })
+      const n = new Notification({ title, body, icon: appIcon })
       n.on('click', () => showWindow())
       n.show()
     }
@@ -146,7 +147,7 @@ async function main(): Promise<void> {
       // The page draws the title bar; Windows keeps its own buttons, drawn over the top-right corner.
       titleBarStyle: 'hidden',
       titleBarOverlay: { color: '#130f15', symbolColor: '#a99ca6', height: 36 },
-      icon: join(resources, 'icon.png'),
+      icon: appIcon,
       autoHideMenuBar: true,
       webPreferences: {
         preload: join(here, '../preload/index.cjs'),

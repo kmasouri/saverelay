@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { buildGraph, filesToClear } from '../src/core/graph'
-import { contentIdOf } from '../src/core/manifest'
-import type { CaptureEvent, SyncEvent } from '../src/core/types'
+import { buildGraph, filesToClear } from './graph'
+import { contentIdOf } from './manifest'
+import type { CaptureEvent, SyncEvent } from './types'
 
 const W = 'world-1'
 let seq = 0

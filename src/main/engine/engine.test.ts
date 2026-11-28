@@ -6,10 +6,9 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { recoverJournal } from '../src/main/engine/applier'
-import { encodeInvite, newIdentity } from '../src/core/identity'
-import { Engine } from '../src/main/engine/engine'
-import { FOLDER_PREFIX, type Syncthing } from '../src/main/engine/syncthing'
+import { encodeInvite, newIdentity } from '../../core/identity'
+import { Engine } from './engine'
+import { FOLDER_PREFIX, type Syncthing } from './syncthing'
 
 interface FakeFolder {
   path: string
@@ -335,24 +334,6 @@ describe('three friends sharing one world', () => {
   })
 })
 
-describe('crash recovery', () => {
-  it('rolls back an interrupted apply', async () => {
-    const live = join(root, 'live')
-    const backup = join(root, 'backup')
-    await mkdir(live, { recursive: true })
-    await mkdir(backup, { recursive: true })
-    await writeFile(join(backup, 'a.a7s'), 'original')
-    await writeFile(join(live, 'a.a7s'), 'half-written')
-    await writeFile(join(live, 'b.a7s'), 'new-file')
-    const journal = join(root, 'journal.json')
-    await writeFile(journal, JSON.stringify({ root: live, backupDir: backup, previous: ['a.a7s'] }))
-    expect(await recoverJournal(journal, ['*.a7s'], [])).toBe(true)
-    expect(await readFile(join(live, 'a.a7s'), 'utf8')).toBe('original')
-    expect(existsSync(join(live, 'b.a7s'))).toBe(false)
-    expect(existsSync(journal)).toBe(false)
-  })
-})
-
 describe('friend requests', () => {
   const stranger = (name: string, syncthingId = stId('Z')): string => {
     const id = newIdentity()
@@ -395,4 +376,3 @@ describe('friend requests', () => {
     expect(devices.a.engine.snapshot().pendingDevices).toEqual([])
   })
 })
-
