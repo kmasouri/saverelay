@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createShutdown } from '../src/main/lifecycle'
+import { createShutdown } from './lifecycle'
 
 describe('shutdown', () => {
   it('stops everything newest first, then exits once', async () => {

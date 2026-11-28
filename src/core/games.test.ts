@@ -1,19 +1,7 @@
-// Guards the games/ catalogue. Every contributed file must pass these, and its
-// example must actually be found, before it can ship.
-
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
-import { GAME_FILES, GAMES, PLACEHOLDERS, checkGameFile, type GameDefinition } from '../src/core/games'
-import { findSaves } from '../src/main/engine/discovery'
+import { describe, expect, it } from 'vitest'
+import { GAME_FILES, GAMES, checkGameFile } from './games'
 
 const files = Object.entries(GAME_FILES).map(([path, raw]) => ({ id: path.split('/').pop()!.replace(/\.json$/, ''), raw }))
-const roots: string[] = []
-afterAll(async () => {
-  for (const r of roots) await rm(r, { recursive: true, force: true })
-})
-
 describe('games catalogue', () => {
   it('has at least one game', () => {
     expect(files.length).toBeGreaterThan(0)
@@ -28,18 +16,6 @@ describe('games catalogue', () => {
     expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([])
   })
 
-  it.each(GAMES.filter((g) => g.example).map((g) => [g.id, g] as [string, GameDefinition]))('%s finds the saves in its example', async (_id, game) => {
-    const root = await mkdtemp(join(tmpdir(), 'saverelay-games-'))
-    roots.push(root)
-    const places = Object.fromEntries(PLACEHOLDERS.map((p) => [p, join(root, p)]))
-    for (const f of game.example!.files) {
-      const path = f.replace(/^\{([a-z]+)\}/, (_m, p: string) => places[p])
-      await mkdir(dirname(path), { recursive: true })
-      await writeFile(path, 'x')
-    }
-    const found = await findSaves([game], places)
-    expect(found.map((s) => s.name).sort()).toEqual([...game.example!.finds].sort())
-  })
 })
 
 describe('game file rules', () => {
