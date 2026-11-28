@@ -214,8 +214,8 @@ export class Syncthing {
       fsWatcherDelayS: 2,
       rescanIntervalS: 60,
       ignorePerms: true,
-      // Events are tiny and say what's new; pull them before save blobs so friends see new versions and choices right away.
-      order: 'smallestFirst',
+      // Events say what's new; events/ sorts before objects/, so friends see new versions and choices before the save blobs arrive.
+      order: 'alphabetic',
       // History lives in our store; the transport never deletes shared content on its own.
       ignoreDelete: true,
     })
