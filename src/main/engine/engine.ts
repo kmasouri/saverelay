@@ -16,7 +16,7 @@ import { buildHistory, type ContentGroup } from '../../core/history'
 import { decodeInvite, encodeInvite, signEvent } from '../../core/identity'
 import { contentIdOf } from '../../core/manifest'
 import { globToRegExp } from '../../core/paths'
-import { DEFAULT_KEEP_VERSIONS, currentPolicy, resolve, type Candidate, type Resolution } from '../../core/reconcile'
+import { DEFAULT_KEEP_VERSIONS, currentPolicy, latestDecisions, overruledDecisions, resolve, type Candidate, type Overruled, type Resolution } from '../../core/reconcile'
 import { SCHEMA, compareEvents, isVersion, type FileEntry, type Policy, type SyncEvent } from '../../core/types'
 import { applySnapshot, recoverJournal } from './applier'
 import { findSaves, type FoundSave } from './discovery'
@@ -41,6 +41,8 @@ interface WorldState {
   pendingSig: string | null
   pendingSince: number
   decided: string[]
+  /** This PC's overruled decisions the user has acknowledged. */
+  dismissedOverrules: string[]
   lastAppliedAt: number
   lastCaptureAt: number
 }
@@ -84,6 +86,8 @@ interface Runtime {
   warnings: string[]
   resolution: Resolution | null
   pendingUpdate: boolean
+  /** This PC's newest choice that lost to a friend's made at about the same time. */
+  overruled: Overruled | null
   notified: Set<string>
 }
 
@@ -191,11 +195,12 @@ export class Engine extends EventEmitter {
       pendingSig: null,
       pendingSince: 0,
       decided: [],
+      dismissedOverrules: [],
       lastAppliedAt: 0,
       lastCaptureAt: 0,
       ...st,
     })
-    this.runtimes.set(w.id, { status: 'setting-up', detail: '', warnings: [], resolution: null, pendingUpdate: false, notified: new Set() })
+    this.runtimes.set(w.id, { status: 'setting-up', detail: '', warnings: [], resolution: null, pendingUpdate: false, overruled: null, notified: new Set() })
   }
 
   private async persistState(worldId: string): Promise<void> {
@@ -463,6 +468,7 @@ export class Engine extends EventEmitter {
       let res = resolve(events)
       rt.resolution = res
       rt.pendingUpdate = 'accepted' in res && res.accepted.contentId !== st.liveContentId
+      this.noteOverruled(w, st, rt, events)
 
       if (isGameRunning(running, w.processNames)) {
         if (!st.playing) {
@@ -559,6 +565,25 @@ export class Engine extends EventEmitter {
     if (changed) await this.persistConfig()
   }
 
+  /** Tells this PC's user when their choice lost to a friend's made without knowing of it. */
+  private noteOverruled(w: WorldConfig, st: WorldState, rt: Runtime, events: SyncEvent[]): void {
+    const mine = overruledDecisions(events).filter((o) => o.decision.deviceId === this.cfg.identity.deviceId && o.decision.basis === 'user')
+    rt.overruled = mine.filter((o) => !st.dismissedOverrules.includes(o.decision.id)).at(-1) ?? null
+    if (rt.overruled) {
+      this.notifyOnce(w.id, `overruled-${rt.overruled.decision.id}`, w.name, `${rt.overruled.by.deviceName} picked a different save at about the same time as you. Everyone continues from theirs; yours stays in history.`)
+    }
+  }
+
+  async dismissOverruled(worldId: string, decisionId: string): Promise<void> {
+    this.world(worldId)
+    const st = this.states.get(worldId)!
+    st.dismissedOverrules = [...st.dismissedOverrules.slice(-50), decisionId]
+    const rt = this.runtimes.get(worldId)!
+    if (rt.overruled?.decision.id === decisionId) rt.overruled = null
+    await this.persistState(worldId)
+    this.emit('change')
+  }
+
   private unstable(st: WorldState): false {
     st.pendingSig = null
     return false
@@ -581,7 +606,7 @@ export class Engine extends EventEmitter {
       const key = res.headIds.join(',')
       const alreadyDecided = events.some((e) => e.kind === 'decision' && e.deviceId === this.cfg.identity.deviceId && [...e.candidates].sort().join(',') === key)
       if (!alreadyDecided && !st.decided.includes(key)) {
-        await this.emitEvent(store, { kind: 'decision', candidates: res.headIds, selected: accepted.versionIds[0], basis: res.policy.policy })
+        await this.emitEvent(store, { kind: 'decision', candidates: res.headIds, selected: accepted.versionIds[0], basis: res.policy.policy, seen: latestDecisions(events) })
         st.decided = [...st.decided.slice(-50), key]
       }
     }
@@ -864,7 +889,9 @@ export class Engine extends EventEmitter {
     if (!res || res.state !== 'conflict') throw new Error('There is no conflict to resolve.')
     const chosen = res.candidates.find((c) => c.contentId === contentId)
     if (!chosen) throw new Error('Unknown candidate')
-    await this.emitEvent(this.stores.get(worldId)!, { kind: 'decision', candidates: res.headIds, selected: chosen.versionIds[0], basis: 'user' })
+    const store = this.stores.get(worldId)!
+    const { events } = await store.loadEvents(this.keyMap())
+    await this.emitEvent(store, { kind: 'decision', candidates: res.headIds, selected: chosen.versionIds[0], basis: 'user', seen: latestDecisions(events) })
     void this.tick()
   }
 
@@ -952,6 +979,7 @@ export class Engine extends EventEmitter {
             : null,
           conflict: res?.state === 'conflict' ? candidates : null,
           autoNote: res?.state === 'auto-resolved' ? res.note : null,
+          overruled: rt?.overruled ? { decisionId: rt.overruled.decision.id, at: rt.overruled.decision.at, byName: rt.overruled.by.deviceName } : null,
           acceptedContentId: res && 'accepted' in res ? res.accepted.contentId : null,
           liveContentId: st?.liveContentId ?? null,
           lastAppliedAt: st?.lastAppliedAt ?? 0,

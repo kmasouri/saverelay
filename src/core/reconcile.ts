@@ -43,24 +43,91 @@ export function currentPolicy(events: SyncEvent[]): PolicySetting {
   }
 }
 
-/** Version ids rejected by earlier decisions. Earlier decisions win; a later one cannot revive a rejected id. */
-function supersededIds(events: SyncEvent[], versions: Map<string, VersionEvent>): Set<string> {
-  const superseded = new Set<string>()
-  const decisions = events.filter((e): e is DecisionEvent => e.kind === 'decision').sort(compareEvents)
-  for (const d of decisions) {
+/**
+ * The decisions each one came after. A decision lists the ones its device had seen;
+ * older events don't, so those keep the clock order they always had among themselves.
+ */
+function decisionPredecessors(decisions: DecisionEvent[]): Map<string, string[]> {
+  const ids = new Set(decisions.map((d) => d.id))
+  const legacy = decisions.filter((d) => !d.seen)
+  return new Map(
+    decisions.map((d) => [d.id, d.seen ? d.seen.filter((id) => ids.has(id) && id !== d.id) : legacy.filter((l) => compareEvents(l, d) < 0).map((l) => l.id)]),
+  )
+}
+
+/**
+ * Decisions in the order they take effect: after every decision they had seen.
+ * Decisions made without knowing of each other are ordered by id, never by clock,
+ * so a PC with a wrong clock can't win.
+ */
+export function orderDecisions(events: SyncEvent[]): DecisionEvent[] {
+  const decisions = events.filter((e): e is DecisionEvent => e.kind === 'decision')
+  const preds = decisionPredecessors(decisions)
+  const byId = new Map(decisions.map((d) => [d.id, d]))
+  const done = new Set<string>()
+  const ordered: DecisionEvent[] = []
+  const byIdAsc = (a: DecisionEvent, b: DecisionEvent): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  while (ordered.length < decisions.length) {
+    const left = [...byId.values()].filter((d) => !done.has(d.id)).sort(byIdAsc)
+    // A forged cycle can't stall ordering: fall back to the lowest id.
+    const next = left.find((d) => preds.get(d.id)!.every((p) => done.has(p))) ?? left[0]
+    done.add(next.id)
+    ordered.push(next)
+  }
+  return ordered
+}
+
+/** The newest decisions known: none of the others came after them. What a new decision records as seen. */
+export function latestDecisions(events: SyncEvent[]): string[] {
+  const decisions = events.filter((e): e is DecisionEvent => e.kind === 'decision')
+  const before = new Set([...decisionPredecessors(decisions).values()].flat())
+  return decisions.filter((d) => !before.has(d.id)).map((d) => d.id).sort()
+}
+
+/**
+ * Version ids rejected by decisions, plus the decisions that lost. A decision only
+ * loses to one it hadn't seen, made at about the same time: someone who had seen a
+ * choice no longer had those saves to pick from.
+ */
+function applyDecisions(events: SyncEvent[], versions: Map<string, VersionEvent>): { superseded: Map<string, DecisionEvent>; overruled: Overruled[] } {
+  /** Rejected version id -> the decision that rejected it. */
+  const superseded = new Map<string, DecisionEvent>()
+  const overruled: Overruled[] = []
+  for (const d of orderDecisions(events)) {
     const selected = versions.get(d.selected)
-    if (!selected || superseded.has(d.selected)) continue
+    if (!selected) continue
+    const by = superseded.get(d.selected)
+    if (by) {
+      overruled.push({ decision: d, by })
+      continue
+    }
     for (const id of d.candidates) {
       const v = versions.get(id)
-      if (v && v.contentId !== selected.contentId) superseded.add(id)
+      if (v && v.contentId !== selected.contentId && !superseded.has(id)) superseded.set(id, d)
     }
   }
-  return superseded
+  return { superseded, overruled }
+}
+
+function versionMap(events: SyncEvent[]): Map<string, VersionEvent> {
+  const versions = new Map<string, VersionEvent>()
+  for (const e of events) if (isVersion(e)) versions.set(e.id, e)
+  return versions
+}
+
+export interface Overruled {
+  decision: DecisionEvent
+  /** The decision it lost to. */
+  by: DecisionEvent
+}
+
+/** Decisions that lost to another made without knowing of it. */
+export function overruledDecisions(events: SyncEvent[]): Overruled[] {
+  return applyDecisions(events, versionMap(events)).overruled
 }
 
 export function heads(events: SyncEvent[]): VersionEvent[] {
-  const versions = new Map<string, VersionEvent>()
-  for (const e of events) if (isVersion(e)) versions.set(e.id, e)
+  const versions = versionMap(events)
 
   const ancestors = new Set<string>()
   const stack: string[] = []
@@ -72,7 +139,7 @@ export function heads(events: SyncEvent[]): VersionEvent[] {
     const v = versions.get(id)
     if (v) stack.push(...v.parents)
   }
-  const superseded = supersededIds(events, versions)
+  const { superseded } = applyDecisions(events, versions)
   return [...versions.values()].filter((v) => !ancestors.has(v.id) && !superseded.has(v.id))
 }
 

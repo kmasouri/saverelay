@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { capture, files, policy, W } from './core.test-fixtures'
 import { buildHistory } from './history'
-import { heads, resolve } from './reconcile'
+import { heads, latestDecisions, orderDecisions, overruledDecisions, resolve } from './reconcile'
 import type { SyncEvent } from './types'
 
 describe('reconcile', () => {
@@ -50,6 +50,44 @@ describe('reconcile', () => {
     expect(heads([base, b, c, d1, d2, next]).map((e) => e.id)).toEqual([next.id])
     expect(buildHistory([base, b, c, d1, next]).map((g) => g.contentId)).toContain(b.contentId)
   })
+  describe('decisions without clocks', () => {
+    const base = capture('a', files({ 'w.a7s': ['a', 1] }))
+    const b = capture('b', files({ 'w.a7s': ['b', 5] }), [base.id])
+    const c = capture('c', files({ 'w.a7s': ['c', 3] }), [base.id])
+    const decide = (id: string, device: string, at: number, candidates: string[], selected: string, seen?: string[]): SyncEvent =>
+      ({ schema: 1, id, worldId: W, deviceId: device, deviceName: device.toUpperCase(), at, kind: 'decision', candidates, selected, basis: 'user', seen }) as SyncEvent
+
+    it('settles decisions made without seeing each other by id, whatever the clocks say', () => {
+      // 'b' claims to be far earlier, but neither had seen the other: the clock doesn't count.
+      const fromA = decide('d-aaa', 'a', 5_000, [b.id, c.id], c.id, [])
+      const fromB = decide('d-bbb', 'b', 1, [b.id, c.id], b.id, [])
+      const res = resolve([base, b, c, fromB, fromA])
+      expect(res.state === 'ok' && res.accepted.contentId).toBe(c.contentId)
+      expect(overruledDecisions([base, b, c, fromA, fromB]).map((o) => [o.decision.id, o.by.id])).toEqual([['d-bbb', 'd-aaa']])
+    })
+
+    it('a decision made after seeing another comes after it, even with a clock behind', () => {
+      // A picks c over b. Later d continues from base too; B, having seen A's choice, picks d over c.
+      const fromA = decide('d-zzz', 'a', 5_000, [b.id, c.id], c.id, [])
+      const d = capture('b', files({ 'w.a7s': ['d', 9] }), [base.id])
+      const fromB = decide('d-aaa', 'b', 1, [c.id, d.id], d.id, ['d-zzz'])
+      const res = resolve([base, b, c, d, fromA, fromB])
+      expect(res.state === 'ok' && res.accepted.contentId).toBe(d.contentId)
+      expect(overruledDecisions([base, b, c, d, fromA, fromB])).toEqual([])
+      // In clock or id order, B's choice would run first and A's would bring b back.
+      expect(orderDecisions([fromB, fromA]).map((e) => e.id)).toEqual(['d-zzz', 'd-aaa'])
+    })
+
+    it('older decisions without seen lists keep their clock order, and new ones record the latest', () => {
+      const old1 = decide('d-zzz', 'a', 1000, [b.id, c.id], c.id)
+      const old2 = decide('d-aaa', 'b', 1001, [b.id, c.id], b.id)
+      expect(orderDecisions([old2, old1]).map((e) => e.id)).toEqual(['d-zzz', 'd-aaa'])
+      expect(latestDecisions([old1, old2])).toEqual(['d-aaa'])
+      const next = decide('d-mmm', 'a', 1, [c.id], c.id, ['d-aaa'])
+      expect(latestDecisions([old1, old2, next])).toEqual(['d-mmm'])
+    })
+  })
+
   it('preferred device wins genuine conflicts', () => {
     const base = capture('a', files({ 'w.a7s': ['a', 1] }))
     const b = capture('b', files({ 'w.a7s': ['b', 1] }), [base.id])

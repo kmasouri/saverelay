@@ -49,6 +49,7 @@ export function parseEvent(raw: unknown, worldId: string, authorDir: string): Si
       return isStr(e.contentId) && HEX64.test(e.contentId) && isIds(e.versionIds) ? (e as unknown as SignedEvent) : null
     case 'decision':
       if (!isIds(e.candidates) || !isStr(e.selected) || !e.candidates.includes(e.selected)) return null
+      if (e.seen !== undefined && !isIds(e.seen)) return null
       return e.basis === 'user' || POLICIES.includes(e.basis as Policy) ? (e as unknown as SignedEvent) : null
     case 'policy':
       if (!POLICIES.includes(e.policy as Policy)) return null

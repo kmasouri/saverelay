@@ -55,6 +55,11 @@ export interface DecisionEvent extends EventBase {
   candidates: string[]
   selected: string
   basis: Policy | 'user'
+  /**
+   * The latest decisions this device knew of when it decided. Orders decisions without
+   * trusting anyone's clock. Absent in events from older versions.
+   */
+  seen?: string[]
 }
 
 /** Group-wide conflict policy; the latest policy event wins. */

@@ -96,6 +96,17 @@
   <div class="card alert small">{w}</div>
 {/each}
 
+{#if world.overruled}
+  {@const o = world.overruled}
+  <section class="card alert row spread">
+    <div class="stack tight">
+      <h2>{o.byName} picked a different save at about the same time as you</h2>
+      <p class="muted">Neither of you had seen the other's choice, so everyone continues from {o.byName}'s. Yours is still in history. Use Restore to bring it back.</p>
+    </div>
+    <button onclick={() => act(() => call('dismissOverruled', world.id, o.decisionId))}>OK</button>
+  </section>
+{/if}
+
 {#if world.conflict}
   <section class="card alert stack">
     <div class="stack tight">

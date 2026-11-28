@@ -39,6 +39,8 @@ export interface World {
   download: Download | null
   conflict: Candidate[] | null
   autoNote: string | null
+  /** This PC's choice that lost to a friend's made at about the same time, until dismissed. */
+  overruled: { decisionId: string; at: number; byName: string } | null
   acceptedContentId: string | null
   liveContentId: string | null
   lastAppliedAt: number

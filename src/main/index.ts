@@ -256,6 +256,7 @@ async function main(): Promise<void> {
     setKeepVersions: (id, n) => engine.setKeepVersions(str(id, 64), Number(n)),
     setPolicy: (id, policy, preferred) => engine.setPolicy(str(id, 64), str(policy, 32) as Policy, preferred === undefined ? undefined : str(preferred, 64)),
     chooseCandidate: (id, contentId) => engine.chooseCandidate(str(id, 64), str(contentId, 64)),
+    dismissOverruled: (id, decisionId) => engine.dismissOverruled(str(id, 64), str(decisionId, 64)),
     restore: (id, contentId) => engine.restore(str(id, 64), str(contentId, 64)),
     history: (id) => engine.history(str(id, 64)),
     openPath: async (p) => {
