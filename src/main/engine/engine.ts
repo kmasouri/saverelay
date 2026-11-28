@@ -17,7 +17,7 @@ import { decodeInvite, encodeInvite, signEvent } from '../../core/identity'
 import { contentIdOf } from '../../core/manifest'
 import { globToRegExp } from '../../core/paths'
 import { DEFAULT_KEEP_VERSIONS, currentPolicy, latestDecisions, overruledDecisions, resolve, type Candidate, type Overruled, type Resolution } from '../../core/reconcile'
-import { SCHEMA, compareEvents, isVersion, type FileEntry, type Policy, type SyncEvent } from '../../core/types'
+import { SCHEMA, compareEvents, fileClockOffset, isVersion, type FileEntry, type Policy, type SyncEvent } from '../../core/types'
 import { applySnapshot, recoverJournal } from './applier'
 import { findSaves, type FoundSave } from './discovery'
 import { loadConfig, saveConfig, type AppConfig, type WorldConfig } from './config'
@@ -231,6 +231,11 @@ export class Engine extends EventEmitter {
   }
 
   private async emitEvent(store: WorldStore, body: Record<string, unknown>): Promise<SyncEvent> {
+    // Every note carries how far this PC's clock is off, so friends can order it by real time.
+    if (!('clockOffsetMs' in body)) {
+      const clockOffsetMs = await this.checkClock()
+      if (clockOffsetMs !== null) body = { ...body, clockOffsetMs }
+    }
     const event = signEvent(
       {
         schema: SCHEMA,
@@ -601,7 +606,8 @@ export class Engine extends EventEmitter {
           files,
           parents: st.basis,
           reason: st.initialized ? 'local' : 'import',
-          ...(clockOffsetMs !== null ? { clockOffsetMs } : {}),
+          // Already checked just above; undefined (couldn't check) is left out of the note.
+          clockOffsetMs: clockOffsetMs ?? undefined,
         })
         st.basis = [ev.id]
         st.initialized = true
@@ -981,7 +987,7 @@ export class Engine extends EventEmitter {
     if (!source) throw new Error('Unknown version')
     const res = resolve(events)
     const parents = res.state === 'conflict' ? res.headIds : 'accepted' in res ? res.accepted.versionIds : []
-    await this.emitEvent(store, { kind: 'restore', contentId, files: source.files, parents, restoredFrom: source.id, clockOffsetMs: source.clockOffsetMs })
+    await this.emitEvent(store, { kind: 'restore', contentId, files: source.files, parents, restoredFrom: source.id, savedClockOffsetMs: fileClockOffset(source) ?? undefined })
     void this.tick()
   }
 

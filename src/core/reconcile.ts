@@ -2,7 +2,7 @@
 // continuation. Deterministic so every peer converges on the same answer.
 
 import { snapshotModifiedAt } from './history'
-import { compareEvents, isVersion, type DecisionEvent, type FileEntry, type Policy, type PolicyEvent, type SyncEvent, type VersionEvent } from './types'
+import { compareEvents, fileClockOffset, isVersion, realTime, type DecisionEvent, type FileEntry, type Policy, type PolicyEvent, type SyncEvent, type VersionEvent } from './types'
 
 export interface Candidate {
   contentId: string
@@ -42,7 +42,7 @@ export function currentPolicy(events: SyncEvent[]): PolicySetting {
     preferredDeviceId: latest.preferredDeviceId,
     keepVersions: latest.keepVersions ?? DEFAULT_KEEP_VERSIONS,
     setBy: latest.deviceName,
-    setAt: latest.at,
+    setAt: realTime(latest),
   }
 }
 
@@ -155,9 +155,10 @@ function groupCandidates(headEvents: VersionEvent[]): Candidate[] {
       byContent.set(v.contentId, c)
     }
     // Same content saved on several PCs: take the times from the first whose clock was checked.
-    if (!c.timeVerified && v.clockOffsetMs !== undefined) {
+    const offset = fileClockOffset(v)
+    if (!c.timeVerified && offset !== null) {
       c.files = v.files
-      c.modifiedAt = snapshotModifiedAt(v.files) + v.clockOffsetMs
+      c.modifiedAt = snapshotModifiedAt(v.files) + offset
       c.timeVerified = true
     }
     c.versionIds.push(v.id)

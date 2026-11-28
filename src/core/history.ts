@@ -1,7 +1,7 @@
 // Shared history: what versions exist and who reported them. Independent of sync
 // policy — nothing here decides which version is active.
 
-import { compareEvents, isVersion, type FileEntry, type SyncEvent, type VersionEvent } from './types'
+import { compareEvents, isVersion, realTime, type FileEntry, type SyncEvent, type VersionEvent } from './types'
 
 export interface Contribution {
   eventId: string
@@ -44,8 +44,8 @@ export function buildHistory(events: SyncEvent[]): ContentGroup[] {
         modifiedAt: snapshotModifiedAt(v.files),
         contributions: [],
         availableOn: [],
-        firstSeenAt: v.at,
-        lastSeenAt: v.at,
+        firstSeenAt: realTime(v),
+        lastSeenAt: realTime(v),
         grouping: 'exact-content',
       }
       groups.set(v.contentId, g)
@@ -61,12 +61,12 @@ export function buildHistory(events: SyncEvent[]): ContentGroup[] {
   for (const e of sorted) {
     if (isVersion(e)) {
       const g = ensure(e)
-      g.lastSeenAt = Math.max(g.lastSeenAt, e.at)
+      g.lastSeenAt = Math.max(g.lastSeenAt, realTime(e))
       g.contributions.push({
         eventId: e.id,
         deviceId: e.deviceId,
         deviceName: e.deviceName,
-        at: e.at,
+        at: realTime(e),
         kind: e.kind,
         reason: e.kind === 'capture' ? e.reason : 'restore',
         restoredFrom: e.kind === 'restore' ? e.restoredFrom : undefined,

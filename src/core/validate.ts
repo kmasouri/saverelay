@@ -39,13 +39,13 @@ export function parseEvent(raw: unknown, worldId: string, authorDir: string): Si
   if (!raw || typeof raw !== 'object') return null
   const e = raw as Record<string, unknown>
   if (e.schema !== SCHEMA || e.worldId !== worldId || e.deviceId !== authorDir) return null
-  if (!isStr(e.id) || !ID.test(e.id) || !isStr(e.deviceName, 64) || !isNum(e.at) || !isStr(e.sig, 200)) return null
+  if (!isStr(e.id) || !ID.test(e.id) || !isStr(e.deviceName, 64) || !isNum(e.at) || !isStr(e.sig, 200) || !isOffset(e.clockOffsetMs)) return null
   switch (e.kind) {
     case 'capture':
-      if (!isIds(e.parents) || (e.reason !== 'local' && e.reason !== 'import') || !isOffset(e.clockOffsetMs)) return null
+      if (!isIds(e.parents) || (e.reason !== 'local' && e.reason !== 'import')) return null
       return validFiles(worldId, e.files, e.contentId) ? (e as unknown as SignedEvent) : null
     case 'restore':
-      if (!isIds(e.parents) || !isStr(e.restoredFrom) || !ID.test(e.restoredFrom) || !isOffset(e.clockOffsetMs)) return null
+      if (!isIds(e.parents) || !isStr(e.restoredFrom) || !ID.test(e.restoredFrom) || !isOffset(e.savedClockOffsetMs)) return null
       return validFiles(worldId, e.files, e.contentId) ? (e as unknown as SignedEvent) : null
     case 'applied':
       return isStr(e.contentId) && HEX64.test(e.contentId) && isIds(e.versionIds) ? (e as unknown as SignedEvent) : null

@@ -52,6 +52,16 @@ describe('history graph', () => {
     expect(g.nodes.map((n) => n.id)).toEqual(['b', 'a'])
   })
 
+  it("orders versions by real time once each PC's clock offset is known", () => {
+    const a = v('a', [], 'a', 100)
+    // Two continuations: c's clock is 50 ahead, so it says 160 but really happened at 110, before b.
+    const b = { ...v('b', ['a'], 'b', 120), clockOffsetMs: 0 }
+    const c = { ...v('c', ['a'], 'c', 160), clockOffsetMs: -50 }
+    const g = buildGraph([a, b, c])
+    expect(g.nodes.map((n) => n.id)).toEqual(['b', 'c', 'a'])
+    expect(byId(g).c.at).toBe(110)
+  })
+
   it('shows an unresolved fork with every competing version on its own side lane', () => {
     const a = v('a')
     const b = v('b', [a.id])

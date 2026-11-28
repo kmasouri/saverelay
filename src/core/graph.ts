@@ -5,7 +5,7 @@
 
 import { snapshotModifiedAt } from './history'
 import { currentPolicy, heads, resolve } from './reconcile'
-import { compareEvents, isVersion, type SyncEvent, type VersionEvent } from './types'
+import { compareEvents, fileClockOffset, isVersion, realTime, type SyncEvent, type VersionEvent } from './types'
 
 export interface GraphNode {
   id: string
@@ -155,8 +155,8 @@ export function buildGraph(events: SyncEvent[]): Graph {
     kind: v.kind,
     reason: v.kind === 'capture' ? v.reason : 'restore',
     deviceId: v.deviceId,
-    at: v.at,
-    savedAt: v.kind === 'capture' ? snapshotModifiedAt(v.files) : v.at,
+    at: realTime(v),
+    savedAt: v.kind === 'capture' ? snapshotModifiedAt(v.files) + (fileClockOffset(v) ?? 0) : realTime(v),
     parentId: parentOf.get(v.id) ?? null,
     restoredFrom: v.kind === 'restore' && versions.has(v.restoredFrom) ? v.restoredFrom : null,
     main: main.has(v.id),

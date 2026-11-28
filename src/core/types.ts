@@ -21,6 +21,8 @@ interface EventBase {
   deviceName: string
   /** Wall-clock time the event was recorded on its device. */
   at: number
+  /** Milliseconds that device's clock was behind real time when it wrote this; absent when it couldn't check. */
+  clockOffsetMs?: number
 }
 
 /** A device captured the live save folder after a local change (or initial import). */
@@ -31,8 +33,6 @@ export interface CaptureEvent extends EventBase {
   /** Version event ids the device was playing from when this was captured. */
   parents: string[]
   reason: 'local' | 'import'
-  /** Milliseconds this device's clock was behind real time at capture; absent when it couldn't check. */
-  clockOffsetMs?: number
 }
 
 /** A user intentionally re-activated historical content. Original attribution stays on the source. */
@@ -42,8 +42,8 @@ export interface RestoreEvent extends EventBase {
   files: FileEntry[]
   parents: string[]
   restoredFrom: string
-  /** The restored capture's clock offset, so its file times stay comparable. */
-  clockOffsetMs?: number
+  /** The clock offset of the save being restored, so its file times stay comparable. */
+  savedClockOffsetMs?: number
 }
 
 /** A device applied content to its live folder. Changes availability, never contribution. */
@@ -83,7 +83,17 @@ export function isVersion(e: SyncEvent): e is VersionEvent {
   return e.kind === 'capture' || e.kind === 'restore'
 }
 
+/** When an event really happened: its device's time, corrected by that clock's measured offset. */
+export function realTime(e: { at: number; clockOffsetMs?: number }): number {
+  return e.at + (e.clockOffsetMs ?? 0)
+}
+
+/** The offset that corrects a version's file save times; null when that PC's clock wasn't checked. */
+export function fileClockOffset(v: VersionEvent): number | null {
+  return (v.kind === 'capture' ? v.clockOffsetMs : v.savedClockOffsetMs) ?? null
+}
+
 /** Stable total order used everywhere a tie must converge across peers. */
-export function compareEvents(a: { at: number; id: string }, b: { at: number; id: string }): number {
-  return a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+export function compareEvents(a: { at: number; id: string; clockOffsetMs?: number }, b: { at: number; id: string; clockOffsetMs?: number }): number {
+  return realTime(a) - realTime(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 }

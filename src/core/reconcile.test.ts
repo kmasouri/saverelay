@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { capture, files, policy, W } from './core.test-fixtures'
 import { buildHistory } from './history'
-import { heads, latestDecisions, orderDecisions, overruledDecisions, resolve } from './reconcile'
+import { currentPolicy, heads, latestDecisions, orderDecisions, overruledDecisions, resolve } from './reconcile'
 import type { SyncEvent } from './types'
 
 describe('reconcile', () => {
@@ -53,6 +53,23 @@ describe('reconcile', () => {
     const res = resolve([base, b, c, policy('latest-modified')])
     expect(res.state).toBe('conflict')
     expect(res.state === 'conflict' && res.note).toMatch(/clock/)
+  })
+  it('a rule change from a PC with a fast clock does not outrank a really later one', () => {
+    // Bob's clock is 10 minutes fast: his change says 10:05 but really happened at 9:55.
+    const bob = { ...policy('latest-modified'), deviceId: 'b', at: 10_05, clockOffsetMs: -10 } as SyncEvent
+    const ann = { ...policy('ask'), at: 10_00, clockOffsetMs: 0 } as SyncEvent
+    expect(currentPolicy([ann, bob]).policy).toBe('ask')
+    // A change from a PC that couldn't check its clock still counts at face value.
+    const unchecked = { ...policy('preferred-device'), at: 10_01 } as SyncEvent
+    expect(currentPolicy([ann, bob, unchecked]).policy).toBe('preferred-device')
+  })
+  it('a restored save keeps its original clock correction for newest-save-wins', () => {
+    const base = capture('a', files({ 'w.a7s': ['a', 1] }))
+    const old = checked(capture('b', files({ 'w.a7s': ['b', 3_600_000 + 50] }), [base.id]), -3_600_000)
+    const restored: SyncEvent = { schema: 1, id: 'r1', worldId: W, deviceId: 'a', deviceName: 'A', at: 99, clockOffsetMs: 0, kind: 'restore', contentId: old.contentId, files: old.files, parents: [base.id], restoredFrom: old.id, savedClockOffsetMs: -3_600_000 }
+    const newer = checked(capture('c', files({ 'w.a7s': ['c', 60] }), [base.id]))
+    const res = resolve([base, old, restored, newer, policy('latest-modified')])
+    expect(res.state === 'auto-resolved' && res.accepted.contentId).toBe(newer.contentId)
   })
   it('a decision stops the rejected branch from reappearing, and the earliest decision wins', () => {
     const base = capture('a', files({ 'w.a7s': ['a', 1] }))
