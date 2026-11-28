@@ -14,8 +14,6 @@ node_modules/
 vendor/
 
 dist/
-/build/*
-!/build/icon.png
 coverage/
 
 __pycache__/

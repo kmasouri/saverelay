@@ -1,9 +1,10 @@
 appId: com.kmasouri.saverelay
 productName: SaveRelay
 copyright: Copyright © 2026 Kayvan Masouri
+icon: installer-icon.png
 directories:
   output: dist
-  buildResources: build
+  buildResources: resources
 files:
   - out/**/*
   - '!out/*/license-report.json'
@@ -12,7 +13,7 @@ afterPack: ./scripts/package-licenses.mjs
 extraResources:
   - from: resources
     to: .
-    filter: ["*.png"]
+    filter: ["app-icon.png", "tray.png", "tray@2x.png"]
 win:
   extraResources:
     - from: resources/syncthing/win32-${arch}
